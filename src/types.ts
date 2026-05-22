@@ -18,6 +18,7 @@ export interface SearchResult {
   links: Link[];
   tags?: string[];
   images?: string[];
+  url?: string;
 }
 
 export interface MergedLink {

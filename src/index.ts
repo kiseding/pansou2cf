@@ -10,14 +10,6 @@ import uiJs from './pages/ui';
 // Import all plugins to trigger registration
 import './plugin/pansearch';
 import './plugin/yunso';
-import './plugin/yunsou';
-import './plugin/qupansou';
-import './plugin/pan666';
-import './plugin/haisou';
-import './plugin/alupan';
-import './plugin/panlian';
-import './plugin/sousou';
-import './plugin/panta';
 
 const app = new Hono();
 

@@ -5,6 +5,7 @@ import type { SearchRequest, SearchResponse, SearchResult, MergedLinks, MergedLi
 // Import all plugins to trigger registration
 import '../plugin/pansearch';
 import '../plugin/yunso';
+import '../plugin/alupan';
 
 const PLUGIN_TIMEOUT_MS = 8000;
 const TG_TIMEOUT_MS = 5000;

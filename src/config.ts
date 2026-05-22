@@ -9,6 +9,9 @@ export interface Env {
   AUTH_ENABLED?: string;
   AUTH_USERS?: string;
   AUTH_JWT_SECRET?: string;
+  ADMIN_USERNAME?: string;
+  ADMIN_PASSWORD?: string;
+  REGISTER_CODE?: string;
 }
 
 export interface AppConfig {
@@ -29,6 +32,12 @@ export function getConfig(env?: any): AppConfig {
 
   const e = (env || {}) as Env;
 
+  const authUsers = parseAuthUsers(e.AUTH_USERS || '');
+  // Always include admin from env vars
+  const adminUser = e.ADMIN_USERNAME || 'admin';
+  const adminPass = e.ADMIN_PASSWORD || 'admin';
+  if (adminPass) authUsers.set(adminUser, adminPass);
+
   _config = {
     channels: (e.CHANNELS || 'tgsearchers6').split(',').map((s: string) => s.trim()).filter(Boolean),
     asyncPluginEnabled: e.ASYNC_PLUGIN_ENABLED !== 'false',
@@ -36,7 +45,7 @@ export function getConfig(env?: any): AppConfig {
     asyncResponseTimeout: parseInt(e.ASYNC_RESPONSE_TIMEOUT || '4'),
     pluginTimeout: parseInt(e.PLUGIN_TIMEOUT || '30'),
     authEnabled: e.AUTH_ENABLED === 'true',
-    authUsers: parseAuthUsers(e.AUTH_USERS || ''),
+    authUsers,
     authJwtSecret: e.AUTH_JWT_SECRET || 'pansou2cf-secret',
   };
 

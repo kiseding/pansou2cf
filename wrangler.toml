@@ -1,0 +1,14 @@
+name = "pansou2cf"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+AUTH_ENABLED = "false"
+AUTH_USERS = ""
+AUTH_JWT_SECRET = ""
+CHANNELS = "tgsearchers6"
+ASYNC_PLUGIN_ENABLED = "true"
+ENABLED_PLUGINS = "pansearch,yunso,yunsou,qupansou,pan666,haisou,alupan,panlian,sousou,panta"
+ASYNC_RESPONSE_TIMEOUT = "4"
+PLUGIN_TIMEOUT = "30"

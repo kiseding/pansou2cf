@@ -5,6 +5,7 @@ import { authRoute } from './routes/auth';
 import { checkRoute } from './routes/check';
 import { getFiltered } from './plugin/registry';
 import { homePage } from './pages/home';
+import uiJs from './pages/ui';
 
 // Import all plugins to trigger registration
 import './plugin/pansearch';
@@ -52,6 +53,12 @@ app.get('/api/health', (c) => {
     plugins_enabled: config.asyncPluginEnabled,
     channels: config.channels, channels_count: config.channels.length,
     plugin_count: plugins.length, plugins: plugins.map(p => p.name),
+  });
+});
+
+app.get('/ui.js', (c) => {
+  return new Response(uiJs, {
+    headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
   });
 });
 

@@ -27,6 +27,34 @@ const props = defineProps<{
   isActivelySearching: boolean;
 }>();
 
+// 各网盘提取码参数名
+const PWD_PARAM: Record<string, string> = {
+  baidu: 'pwd', quark: 'pwd', aliyun: 'password', alipan: 'password',
+  xunlei: 'pwd', uc: 'pwd', '123': 'pwd', tianyi: 'pwd', mobile: 'pwd',
+  pikpak: 'pwd', '115': 'password',
+};
+
+function buildIntegratedUrl(item: MergedResultItem): string {
+  if (!item.url) return '';
+  if (!item.password) return item.url;
+  try {
+    const u = new URL(item.url);
+    // Check if password is already in URL
+    for (const k of Object.values(PWD_PARAM)) {
+      if (u.searchParams.get(k) === item.password) return u.href;
+    }
+    // Add password param
+    const diskType = activeTab.value;
+    const param = PWD_PARAM[diskType] || 'pwd';
+    u.searchParams.set(param, item.password);
+    return u.href;
+  } catch {
+    // Fallback: just append
+    const sep = item.url.includes('?') ? '&' : '?';
+    return item.url + sep + 'pwd=' + encodeURIComponent(item.password);
+  }
+}
+
 // 当前激活的标签
 const activeTab = ref('');
 // 当前标签页的数据
@@ -587,7 +615,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 const copyDetailField = async (type: 'link' | 'password') => {
   if (!detailItem.value) return;
 
-  const text = type === 'link' ? detailItem.value.url : detailItem.value.password;
+  const text = type === 'link' ? buildIntegratedUrl(detailItem.value) : detailItem.value.password;
   if (!text) return;
 
   const success = await copyToClipboard(text);
@@ -766,26 +794,14 @@ onUnmounted(() => {
             
             <!-- 第二行：链接和提取码 -->
             <div class="result-row">
-              <div class="result-link" @click="openLink(item.url)">{{ item.url }}</div>
+              <div class="result-link" @click="openLink(buildIntegratedUrl(item))">{{ buildIntegratedUrl(item) }}</div>
               <button
                 v-if="item.password"
                 type="button"
                 class="result-password"
-                :class="{
-                  copied: getListPasswordStatus(item, index) === 'success',
-                  'copy-failed': getListPasswordStatus(item, index) === 'error'
-                }"
-                @click="copyListPassword(item, index)"
+                @click="copyToClipboard(buildIntegratedUrl(item))"
               >
-                <template v-if="getListPasswordStatus(item, index) === 'success'">
-                  复制成功
-                </template>
-                <template v-else-if="getListPasswordStatus(item, index) === 'error'">
-                  复制失败
-                </template>
-                <template v-else>
-                  提取码: <span class="password-value">{{ item.password }}</span>
-                </template>
+                提取码: <span class="password-value">{{ item.password }}</span>
               </button>
             </div>
           </div>
@@ -867,10 +883,10 @@ onUnmounted(() => {
             <button
               type="button"
               class="detail-link-preview"
-              :title="detailItem.url"
-              @click="openLink(detailItem.url)"
+              :title="buildIntegratedUrl(detailItem)"
+              @click="openLink(buildIntegratedUrl(detailItem))"
             >
-              {{ detailItem.url }}
+              {{ buildIntegratedUrl(detailItem) }}
             </button>
           </div>
         </div>

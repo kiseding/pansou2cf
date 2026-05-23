@@ -5,6 +5,10 @@ import { bootPlugins } from '../plugin/boot';
 import { extractLinksFromText } from '../plugin/netdisk-patterns';
 bootPlugins();
 
+// Plugin-level cache: pluginName:keyword → results + expiry
+const pluginCache = new Map<string, { results: SearchResult[]; expires: number }>();
+const PLUGIN_CACHE_TTL = 300_000; // 5 min — subsequent search rounds hit cache
+
 // ── Constants ──
 
 const PLUGIN_TIMEOUT_MS = 15000;
@@ -329,10 +333,21 @@ async function searchPlugin(name: string, keyword: string): Promise<SearchResult
   try {
     const plugin = getByName(name);
     if (!plugin) return [];
-    const promise = plugin.search(keyword);
-    const timeoutPromise = new Promise<SearchResult[]>((r) => setTimeout(() => r([]), PLUGIN_TIMEOUT_MS));
-    const results = await Promise.race([promise, timeoutPromise]);
-    return results.map(r => ({ ...r, channel: `plugin:${name}` }));
+
+    // Plugin-level cache: avoids re-fetching in later search rounds
+    const ck = `${name}:${keyword.toLowerCase()}`;
+    const cached = pluginCache.get(ck);
+    if (cached && cached.expires > Date.now()) return cached.results;
+
+    // Race: timeout returns partial results instead of empty
+    let partial: SearchResult[] = [];
+    const promise = plugin.search(keyword).then(r => { partial = r; return r; });
+    const timeout = new Promise<SearchResult[]>((r) => setTimeout(() => r(partial), PLUGIN_TIMEOUT_MS));
+    const results = await Promise.race([promise, timeout]);
+
+    const tagged = results.map(r => ({ ...r, channel: `plugin:${name}` }));
+    pluginCache.set(ck, { results: tagged, expires: Date.now() + PLUGIN_CACHE_TTL });
+    return tagged;
   } catch { return []; }
 }
 

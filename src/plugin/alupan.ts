@@ -39,15 +39,19 @@ function extractPassword(text: string, url?: string): string {
   return '';
 }
 
-// Link patterns — specific to each netdisk type
+// Link patterns — specific to each netdisk type (matching Go + config-engine superset)
 const linkPatterns: Array<{ regex: RegExp; type: string }> = [
   { regex: /https?:\/\/pan\.quark\.cn\/s\/[0-9A-Za-z]+/g, type: 'quark' },
-  { regex: /https?:\/\/www\.aliyundrive\.com\/s\/[0-9A-Za-z]+/g, type: 'aliyun' },
+  { regex: /https?:\/\/(?:www\.)?aliyundrive\.com\/s\/[0-9A-Za-z]+/g, type: 'aliyun' },
+  { regex: /https?:\/\/www\.alipan\.com\/s\/[0-9A-Za-z]+/g, type: 'aliyun' },
   { regex: /https?:\/\/pan\.baidu\.com\/s\/[0-9A-Za-z_-]+/g, type: 'baidu' },
   { regex: /https?:\/\/www\.123pan\.com\/s\/[0-9A-Za-z]+/g, type: '123' },
   { regex: /https?:\/\/pan\.xunlei\.com\/s\/[0-9A-Za-z]+/g, type: 'xunlei' },
   { regex: /https?:\/\/drive\.uc\.cn\/s\/[0-9A-Za-z]+/g, type: 'uc' },
   { regex: /https?:\/\/115\.com\/s\/[0-9A-Za-z]+/g, type: '115' },
+  { regex: /https?:\/\/115cdn\.com\/s\/[0-9A-Za-z]+/g, type: '115' },
+  { regex: /https?:\/\/cloud\.189\.cn\/t\/[0-9A-Za-z]+/g, type: 'tianyi' },
+  { regex: /https?:\/\/caiyun\.139\.com\/w\/i\/[0-9A-Za-z]+/g, type: 'mobile' },
 ];
 
 const alupanPlugin: AsyncPlugin = {
@@ -118,9 +122,10 @@ function parseAlupanHtml(html: string): SearchResult[] {
       finalTitle = textMatch ? htmlDecode(textMatch[1].replace(/<[^>]*>/g, '').trim()) : '';
     }
 
-    if (links.length > 0 && finalTitle) {
+    if (links.length > 0) {
+      // Only set password as fallback, don't override per-link passwords
       for (const l of links) {
-        if (password) l.password = password;
+        l.password = l.password || password;
       }
       results.push({
         message_id: 'alupan_' + idx,

@@ -39,37 +39,47 @@ const yunsoPlugin: AsyncPlugin = {
 
 function parseYunsoHtml(html: string): SearchResult[] {
   const results: SearchResult[] = [];
-
-  // Match yunso search result cards: div.layui-card[data-qid]
-  // Each card contains an a[onclick*="open_sid"] with url/pa/id attributes
-  const cardRegex = /<div[^>]*class="[^"]*layui-card[^"]*"[^>]*data-qid="([^"]*)"[^>]*>([\s\S]*?)(?=<div[^>]*class="[^"]*layui-card[^"]*"|<div[^>]*id="yunso-page)/gi;
-
-  // Simpler approach: find all anchors with onclick="open_sid"
-  const anchorRegex = /<a[^>]*onclick="open_sid[^"]*"[^>]*url="([^"]*)"[^>]*pa="([^"]*)"[^>]*id="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-  // Also extract from surrounding card: data-qid, .layui-card-body span (file summary), img alt (type), datetime
-
-  let m;
   let idx = 0;
-  while ((m = anchorRegex.exec(html)) !== null && idx < 50) {
-    const url = htmlDecode(m[1] || '');
-    const password = htmlDecode(m[2] || '');
-    const fullId = m[3] || '';
-    const titleHtml = m[4] || '';
-    const title = htmlDecode(titleHtml.replace(/<[^>]*>/g, '').trim());
 
+  // Find anchors with onclick="open_sid" — extract attributes individually (order-independent)
+  const anchorRe = /<a\b[^>]*onclick="open_sid[^"]*"[^>]*>/gi;
+  let m;
+  while ((m = anchorRe.exec(html)) !== null && idx < 50) {
+    const tag = m[0];
+    // Extract attributes individually — any order
+    const urlMatch = tag.match(/url="([^"]*)"/);
+    const paMatch = tag.match(/pa="([^"]*)"/);
+    const idMatch = tag.match(/id="([^"]*)"/);
+
+    const url = htmlDecode(urlMatch?.[1] || '');
+    const password = htmlDecode(paMatch?.[1] || '');
+    const fullId = idMatch?.[1] || '';
     if (!url) continue;
 
-    // Try to find title from surrounding context if empty
+    // Extract inner text from the <a> tag
+    const afterTag = html.indexOf(tag, m.index) + tag.length;
+    const closeIdx = html.indexOf('</a>', afterTag);
+    const innerHTML = closeIdx > afterTag ? html.substring(afterTag, closeIdx) : '';
+    const title = htmlDecode(innerHTML.replace(/<[^>]*>/g, '').trim());
+
+    // Find card context (300 chars before the anchor)
     const pos = m.index;
-    const context = html.substring(Math.max(0, pos - 300), pos);
-    const titleMatch = context.match(/layui-card-header[^>]*>([\s\S]*?)<\/div>/i);
-    const dateTitle = titleMatch ? htmlDecode(titleMatch[1].replace(/<[^>]*>/g, '').trim()) : '';
+    const context = html.substring(Math.max(0, pos - 400), pos + tag.length + 100);
+
+    // Title from card header (before or after the anchor)
+    const headerMatch = context.match(/layui-card-header[^>]*>([\s\S]*?)<\/div>/i);
+
+    // Try context-before (300 chars before) for header
+    const beforeCtx = html.substring(Math.max(0, pos - 400), pos);
+    const headerBefore = beforeCtx.match(/layui-card-header[^>]*>([\s\S]*?)<\/div>/i);
+
+    const dateTitle = htmlDecode(((headerMatch || headerBefore)?.[1] || '').replace(/<[^>]*>/g, '').trim());
     const finalTitle = title || dateTitle || '';
 
-    // Extract datetime from context
-    const dateMatch = dateTitle.match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/);
+    // Datetime from card header
+    const dateMatch = (dateTitle || context).match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/);
 
-    // Try to find netdisk type from nearby img
+    // Netdisk type from img
     const typeMatch = context.match(/\/assets\/xyso\/(\d+)\.png/);
     const typeCodeMap: Record<string, string> = {
       '1': 'baidu', '2': 'quark', '3': 'aliyun', '4': 'xunlei', '5': 'uc', '6': '123', '7': 'tianyi',

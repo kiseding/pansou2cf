@@ -148,7 +148,8 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
     promises.push((async () => {
       const pluginList = getFiltered(normalizedPlugins);
       const conc = Math.min(req.conc || 10, 20);
-      const tasks = pluginList.slice(0, conc).map(p => () => searchPlugin(p.name, keyword));
+      // Run ALL plugins (not just first N), concurrency controls parallelism
+      const tasks = pluginList.map(p => () => searchPlugin(p.name, keyword));
       const all = await runWithConcurrency(tasks, conc);
       pluginResults = all.flat();
     })());

@@ -119,7 +119,7 @@ function extractLinks(html: string, source: string, keyword: string): SearchResu
   for (const { re, type } of netdiskPatterns) {
     re.lastIndex = 0;
     let m;
-    while ((m = re.exec(html)) !== null && idx < 30) {
+    while ((m = re.exec(html)) !== null && results.length < 30) {
       const u = m[0].replace(/&amp;/g, '&');
       if (seen.has(u)) continue;
       seen.add(u);
@@ -168,7 +168,7 @@ function guessType(url: string): string {
   const u = url.toLowerCase();
   if (u.includes('pan.quark') || u.includes('quark')) return 'quark';
   if (u.includes('pan.baidu') || u.includes('baidu')) return 'baidu';
-  if (u.includes('alipan') || u.includes('aliyundrive')) return 'alipan';
+  if (u.includes('alipan') || u.includes('aliyundrive')) return 'aliyun';
   if (u.includes('115.com')) return '115';
   if (u.includes('xunlei') || u.includes('.xl') || u.includes('thunder')) return 'xunlei';
   if (u.includes('drive.uc') || u.includes('uc.cn')) return 'uc';

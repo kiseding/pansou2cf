@@ -407,7 +407,6 @@ export async function configSearch(config: PluginConfig, keyword: string): Promi
     const url = config.searchUrl.replace(/\{keyword\}/g, encodeURIComponent(keyword));
     const mode = config.mode || 'auto';
 
-    // Extract the search source domain for same-origin filtering
     let sourceHost = '';
     try { sourceHost = new URL(config.searchUrl).hostname; } catch {}
 
@@ -423,28 +422,33 @@ export async function configSearch(config: PluginConfig, keyword: string): Promi
     clearTimeout(t);
     if (!res.ok) return [];
 
+    // Read body ONCE to avoid "body already used" error
+    const text = await res.text();
     const ct = res.headers.get('content-type') || '';
 
+    // JSON mode: try parsing as JSON, return empty if it fails
     if (mode === 'json' || (mode === 'auto' && ct.includes('json'))) {
       try {
-        const data = await res.json();
-        return parseJsonResponse(data, config).filter(r => filterSameOrigin(r, sourceHost));
-      } catch { /* fall through */ }
-    }
-
-    const html = await res.text();
-
-    // Even in "auto" or "html" mode, try JSON parsing on the text
-    if (mode === 'auto' || 'json') {
-      try {
-        const data = JSON.parse(html);
+        const data = JSON.parse(text);
         if (data && typeof data === 'object') {
           return parseJsonResponse(data, config).filter(r => filterSameOrigin(r, sourceHost));
         }
-      } catch { /* not JSON */ }
+      } catch { /* not valid JSON, fall through */ }
+      // In explicit JSON mode, don't try HTML fallback
+      if (mode === 'json') return [];
     }
 
-    return parseHtmlResponse(html, config.name).filter(r => filterSameOrigin(r, sourceHost));
+    // Auto mode: try JSON parse on text (in case CT header is wrong)
+    if (mode === 'auto') {
+      try {
+        const data = JSON.parse(text);
+        if (data && typeof data === 'object') {
+          return parseJsonResponse(data, config).filter(r => filterSameOrigin(r, sourceHost));
+        }
+      } catch { /* not JSON, use HTML parsing */ }
+    }
+
+    return parseHtmlResponse(text, config.name).filter(r => filterSameOrigin(r, sourceHost));
   } catch {
     return [];
   }

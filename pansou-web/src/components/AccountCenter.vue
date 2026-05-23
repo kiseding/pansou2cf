@@ -41,22 +41,15 @@ const panlianAccountCount = computed(() => panlianAccounts.value.length)
 const weiboAccounts = ref<any[]>([])
 const weiboAccountCount = computed(() => weiboAccounts.value.length)
 
-// 检查服务是否启用
-const isQQPDEnabled = computed(() => {
-  return props.backendHealth?.plugins?.includes('qqpd') || false
-})
+const backendPlugins = computed(() =>
+  (props.backendHealth as any)?.all_plugins || props.backendHealth?.plugins || []
+)
 
-const isGyingEnabled = computed(() => {
-  return props.backendHealth?.plugins?.includes('gying') || false
-})
-
-const isPanlianEnabled = computed(() => {
-  return props.backendHealth?.plugins?.includes('panlian') || false
-})
-
-const isWeiboEnabled = computed(() => {
-  return props.backendHealth?.plugins?.includes('weibo') || false
-})
+// 检查服务是否启用（基于全量插件列表，不是仅启用的）
+const isQQPDEnabled = computed(() => backendPlugins.value.includes('qqpd'))
+const isGyingEnabled = computed(() => backendPlugins.value.includes('gying'))
+const isPanlianEnabled = computed(() => backendPlugins.value.includes('panlian'))
+const isWeiboEnabled = computed(() => backendPlugins.value.includes('weibo'))
 
 // 加载账号状态
 const loadAccountsStatus = () => {

@@ -72,6 +72,9 @@ app.get('/api/health', (c) => {
     // All available plugins (for frontend config UI)
     all_plugins: allPlugins.map(p => p.name),
     all_plugin_count: allPlugins.length,
+    // Deprecated: use all_plugins, kept for backward compat
+    plugins: allPlugins.map(p => p.name),
+    plugin_count: allPlugins.length,
     // Currently enabled (subset)
     enabled_plugins: enabledPlugins.map(p => p.name),
     enabled_plugin_count: enabledPlugins.length,

@@ -2,13 +2,14 @@ import { getConfig } from '../config';
 import { getFiltered, getByName } from '../plugin/registry';
 import type { SearchRequest, SearchResponse, SearchResult, MergedLinks, MergedLink, Link } from '../types';
 import { bootPlugins } from '../plugin/boot';
+import { extractLinksFromText } from '../plugin/netdisk-patterns';
 bootPlugins();
 
 // ── Constants ──
 
-const PLUGIN_TIMEOUT_MS = 8000;
-const TG_TIMEOUT_MS = 5000;
-const OVERALL_TIMEOUT_MS = 20000;
+const PLUGIN_TIMEOUT_MS = 15000;
+const TG_TIMEOUT_MS = 8000;
+const OVERALL_TIMEOUT_MS = 30000;
 const CACHE_TTL_SECONDS = 600;
 
 const PRIORITY_KEYWORDS = ['合集', '系列', '全', '完', '最新', '附', 'complete'];
@@ -138,8 +139,10 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
 
   if (useTg && req.channels) {
     promises.push((async () => {
-      const tasks = req.channels!.slice(0, 3).map(ch => () => searchTGChannel(ch, keyword));
-      const all = await runWithConcurrency(tasks, Math.min(req.conc || 10, 20));
+      // Search ALL channels (not just 3), matching Go behavior
+      const tasks = req.channels!.map(ch => () => searchTGChannel(ch, keyword));
+      const concurrency = Math.min((req.conc || 10) * 2, 50);
+      const all = await runWithConcurrency(tasks, concurrency);
       tgResults = all.flat();
     })());
   }
@@ -213,29 +216,86 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
 
 async function searchTGChannel(channel: string, keyword: string): Promise<SearchResult[]> {
   try {
-    const url = `https://${channel}.pages.dev/search?q=${encodeURIComponent(keyword)}`;
+    // Go uses: https://t.me/s/{channel}?q={keyword}
+    const url = `https://t.me/s/${channel}?q=${encodeURIComponent(keyword)}`;
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), TG_TIMEOUT_MS);
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'PanSou/2.0' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
       signal: ctrl.signal,
     });
     clearTimeout(t);
     if (!res.ok) return [];
-    const data = await res.json() as any;
-    const items = data?.results || data?.data || [];
-    if (!Array.isArray(items)) return [];
-    return items.slice(0, 20).map((item: any, idx: number) => ({
-      message_id: item.message_id || `${channel}_${idx}`,
-      unique_id: item.unique_id || item.url || `${channel}_${idx}`,
-      channel: `tg:${channel}`,
-      datetime: item.datetime || new Date().toISOString(),
-      title: item.title || 'TG_' + idx,
-      content: item.content || '',
-      links: item.links || [],
-      images: item.images || [],
-    }));
+    const html = await res.text();
+    return parseTelegramHTML(html, channel);
   } catch { return []; }
+}
+
+// Parse t.me/s/ HTML messages to extract netdisk links
+function parseTelegramHTML(html: string, channel: string): SearchResult[] {
+  const results: SearchResult[] = [];
+  // Each message is in a div.tgme_widget_message_wrap
+  const msgRe = /<div\s+class="tgme_widget_message_wrap[^"]*"\s*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/gi;
+  // Simpler: find message containers with data-post attribute
+  const msgRe2 = /<div\s+class="tgme_widget_message[^"]*"\s+data-post="([^"]*)"[^>]*>([\s\S]*?)(?=<div\s+class="tgme_widget_message[^"]*"\s+data-post="|$)/gi;
+
+  let m;
+  let idx = 0;
+  while ((m = msgRe2.exec(html)) !== null && idx < 50) {
+    const postId = m[1];
+    const msgHTML = m[2];
+
+    // Extract text content from .tgme_widget_message_text
+    const textMatch = msgHTML.match(/<div\s+class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    const content = textMatch ? textMatch[1].replace(/<[^>]*>/g, '\n').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim() : '';
+
+    // Extract links from message text
+    const links = extractLinksFromText(content);
+    if (links.length === 0) {
+      // Also check raw HTML for netdisk URLs
+      const rawLinks = extractLinksFromText(msgHTML);
+      links.push(...rawLinks);
+    }
+    // Deduplicate
+    const seenUrls = new Set<string>();
+    const uniqueLinks = links.filter(l => {
+      if (seenUrls.has(l.url)) return false;
+      seenUrls.add(l.url);
+      return true;
+    });
+
+    if (uniqueLinks.length === 0) continue;
+
+    // Extract datetime from time tag
+    const timeMatch = msgHTML.match(/<time[^>]*datetime="([^"]*)"/);
+    const datetime = timeMatch?.[1] || new Date().toISOString();
+
+    // Title = first line of content
+    const title = content.split('\n')[0]?.trim().slice(0, 80) || `tg_${idx}`;
+
+    // Extract images
+    const images: string[] = [];
+    const imgRe = /<img[^>]*src="([^"]*)"[^>]*>/gi;
+    let imgM;
+    while ((imgM = imgRe.exec(msgHTML)) !== null) {
+      if (!imgM[1].includes('emoji') && !imgM[1].includes('icon')) {
+        images.push(imgM[1]);
+      }
+    }
+
+    results.push({
+      message_id: postId,
+      unique_id: postId,
+      channel: `tg:${channel}`,
+      datetime,
+      title,
+      content: content.slice(0, 500),
+      links: uniqueLinks.map(l => ({ type: l.type, url: l.url, password: l.password })),
+      images,
+    });
+    idx++;
+  }
+  return results;
 }
 
 // ── Plugin ──

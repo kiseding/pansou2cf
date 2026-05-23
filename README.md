@@ -1,36 +1,13 @@
 # PanSou2CF
 
-PanSou 网盘资源搜索的 Cloudflare Workers 移植版。89 个搜索插件、9 种网盘链路检测、4 个账号管理插件、Vue 前端，完整复刻原 Go 版功能。
+PanSou 网盘资源搜索的 Cloudflare Workers 移植版。将原 Go 项目完整迁移到 TypeScript，包括 89 个搜索插件、9 种网盘链路检测、4 个账号管理插件和 Vue 3 前端，可直接部署在 Cloudflare Workers 免费额度内运行。
 
-## 项目结构
+## 快速开始
 
-```
-src/
-  index.ts                  # Hono 应用入口 + 中间件
-  config.ts                 # 环境变量配置
-  types.ts                  # 类型定义
-  routes/
-    search.ts               # GET/POST  /api/search
-    auth.ts                 # POST      /api/auth/*
-    check.ts                # POST      /api/check/links
-    plugin-panlian.ts       # POST/GET  /panlian/:hash  账号管理
-    plugin-qqpd.ts          # POST/GET  /qqpd/:hash     账号管理
-    plugin-gying.ts         # POST/GET  /gying/:hash    账号管理
-    plugin-weibo.ts         # POST/GET  /weibo/:hash    账号管理
-  service/
-    search.ts               # 搜索编排：并行、缓存、去重、排序、链接-标题关联
-    check.ts                # 9 种网盘 API 级链接验证
-    kv-session.ts           # KV 会话存储 + AES-256-GCM 加密
-  plugin/
-    registry.ts             # 插件注册表
-    boot.ts                 # 启动引导
-    configs.ts              # 89 个插件配置
-    config-engine.ts        # 通用解析引擎（JSON + 4层HTML策略）
-    pansearch.ts            # pansearch.me 专用
-    yunso.ts                # yunso.net 专用
-    alupan.ts               # alupan.net 专用
-pansou-web/                 # Vue 3 前端（独立构建）
-```
+1. Fork 本仓库
+2. 创建 Cloudflare KV 命名空间 `PLUGIN_KV`，记下 ID
+3. 在 GitHub Secrets 设置 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`、`PLUGIN_KV_ID`、`ADMIN_PASSWORD`
+4. Actions → Deploy to Cloudflare → Run workflow
 
 ## API
 
@@ -39,56 +16,44 @@ pansou-web/                 # Vue 3 前端（独立构建）
 | 参数 | 说明 | 默认值 |
 |---|---|---|
 | `kw` | 搜索关键词（必填） | - |
-| `src` | 来源：`all` / `tg` / `plugin` | `all` |
-| `plugins` | 指定插件，逗号分隔 | 全部 89 个 |
+| `src` | `all` / `tg` / `plugin` | `all` |
+| `plugins` | 指定插件，逗号分隔 | 默认 22 个精选 |
 | `channels` | TG 频道，逗号分隔 | `tgsearchers6` |
-| `conc` | 并发数 | 10, 最大 20 |
-| `refresh` | 绕过缓存 | `false` |
-| `res` | 返回格式：`merged_by_type` / `results` | `merged_by_type` |
-| `cloud_types` | 网盘过滤：`quark,baidu,alipan,xunlei,uc,123` | 全部 |
-| `filter` | 关键词过滤 `{"include":["4K"],"exclude":["短剧"]}` | - |
-
-响应：
+| `conc` | 并发数，最大 20 | 10 |
+| `refresh` | 绕过缓存 | false |
+| `res` | `merged_by_type` / `results` | `merged_by_type` |
+| `cloud_types` | 网盘过滤 `quark,baidu,alipan,xunlei,uc,123` | 全部 |
+| `filter` | `{"include":["4K"],"exclude":["短剧"]}` | - |
 
 ```json
 {
-  "code": 0,
-  "message": "success",
+  "code": 0, "message": "success",
   "data": {
-    "total": 100,
+    "total": 42,
     "merged_by_type": {
-      "quark": [{ "url": "https://pan.quark.cn/s/abc", "password": "1234", "note": "资源标题", "datetime": "2025-01-15T10:30:00Z", "source": "plugin:pansearch" }],
-      "baidu": [{ "url": "https://pan.baidu.com/s/1xyz", "password": "abcd", "note": "另一个资源", "datetime": "...", "source": "tg:tgsearchers6" }]
+      "quark": [{"url": "...", "password": "1234", "note": "资源标题", "datetime": "2025-01-15T10:30:00Z", "source": "plugin:pansearch"}]
     },
-    "results": [{ "message_id": "pansearch_0", "unique_id": "...", "title": "...", "links": [...] }]
+    "results": [{"message_id": "ps_0", "title": "...", "links": [{"type": "quark", "url": "...", "password": "1234"}]}]
   }
 }
 ```
 
 ### 链接检测 `POST /api/check/links`
 
-支持 9 种网盘 API 级验证，参数支持自动识别和手动指定两种格式：
+支持 9 种网盘 API 级验证，自动识别或手动指定类型。
 
-```json
-// 自动识别
-{ "links": ["https://pan.quark.cn/s/abc", "https://pan.baidu.com/s/1x?pwd=1234"] }
-// 手动指定
-{ "items": [{ "diskType": "quark", "url": "https://pan.quark.cn/s/abc", "password": "1234" }] }
-```
+| 网盘 | 标识 | 验证方式 |
+|---|---|---|
+| 夸克 | `quark` | Token API → Detail API |
+| 百度 | `baidu` | 密码验证 → 列表 API |
+| 阿里 | `aliyun` | Share API |
+| UC | `uc` | 页面检测 |
+| 123 | `123` | Info API |
+| 迅雷 | `xunlei` | Share API |
+| 115 | `115` | Snap API |
+| 天翼 | `tianyi` | XML API |
 
-响应 `state`：`ok`（有效，TTL 24h）/ `bad`（失效，6h）/ `locked`（需提取码，12h）/ `uncertain`（不确定，30m）/ `unsupported`（不支持）
-
-| 网盘 | 验证方式 |
-|---|---|
-| 夸克 Quark | Token API → Detail API |
-| 百度 Baidu | 密码验证 → 列表 API |
-| 阿里 Aliyun | Share API 匿名获取 |
-| UC | 页面内容检测 |
-| 123 | Share Info API |
-| 迅雷 Xunlei | Share API |
-| 115 | Snap API |
-| 天翼 Tianyi | XML API |
-| 移动 Mobile | 暂不支持（需 AES-CBC 加密） |
+响应 state：`ok`（24h）/ `bad`（6h）/ `locked`（12h）/ `uncertain`（30m）
 
 ### 认证
 
@@ -100,114 +65,91 @@ POST /api/auth/logout
 
 ### 账号管理插件
 
-4 个插件的完整账号管理功能，通过 KV 持久化会话。
+4 个插件通过 KV 持久化会话，每个提供 `get_status` / `login` / `logout` / `test_search` action。
 
-| 插件 | 路径 | 认证方式 | 搜索源 |
+| 插件 | 路由 | 登录方式 | 搜索源 |
 |---|---|---|---|
 | Panlian | `/panlian/:hash` | 用户名+密码 | pinglian.lol |
-| QQPD | `/qqpd/:hash` | QQ 二维码扫码 | pd.qq.com 频道 |
-| Gying | `/gying/:hash` | 用户名+密码 | gying.net（可配镜像站） |
-| Weibo | `/weibo/:hash` | 微博二维码扫码 | weibo.com 用户博客 |
-
-每个插件提供 `get_status` / `login` / `logout` / `test_search` 等 action，通过 `POST /plugin/:hash` 调用，与 Go 版接口完全兼容。
+| QQPD | `/qqpd/:hash` | QQ 扫码 | pd.qq.com 频道 |
+| Gying | `/gying/:hash` | 用户名+密码 | gying.net |
+| Weibo | `/weibo/:hash` | 微博扫码 | weibo.com 用户博客 |
 
 ### 健康检查
 
 ```
 GET /api/health
-→ { "status": "ok", "plugin_count": 89, "plugins": [...], "auth_enabled": false }
 ```
-
-## 搜索算法
-
-与 Go 版一致的三维排序 + 质量过滤：
-
-- 链接-标题关联：从 TG 消息正文逐条提取每个链接的具体标题
-- 智能合并：同键结果按完整度评分选最优（UniqueID +10, 链接 +5+个数, 内容 +3, 标题/10, 频道 +2）
-- 排序打分：时间分（0-500）+ 关键词优先分（0-490）+ 插件等级分（-200~1000）
-- Results 过滤：只有高质量结果（有时间/含优先关键词/高等级插件）进入 `results` 字段
-- 密码提取：正则匹配（`提取码`/`密码`/`pwd`/`访问码`）+ URL 参数（`?pwd=`）
 
 ## 部署
 
-### 1. Fork 仓库
+### GitHub Secrets
 
-### 2. 创建 Cloudflare KV Namespace
+| Secret | 必填 | 说明 |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | ✓ | Edit Cloudflare Workers 权限 |
+| `CLOUDFLARE_ACCOUNT_ID` | ✓ | Cloudflare 账户 ID |
+| `PLUGIN_KV_ID` | ✓ | KV namespace ID |
+| `ADMIN_PASSWORD` | ✓ | 管理员密码 |
+| `PANLIAN_ENCRYPTION_KEY` 等 | | 插件加密密钥（可选，有默认值） |
 
-在 Cloudflare 控制台 → Workers & Pages → KV → 创建命名空间，命名为 `PLUGIN_KV`。记下 ID。
-
-或通过 CLI：
+创建 KV namespace：
 ```bash
 npx wrangler kv:namespace create PLUGIN_KV
 ```
 
-### 3. 配置 GitHub Secrets
+### 环境变量
 
-仓库 Settings → Secrets and variables → Actions → Secrets：
-
-**必填：**
-
-| Secret | 说明 |
+| 变量 | 默认值 |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | API Token（Edit Cloudflare Workers 模板） |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID |
-| `PLUGIN_KV_ID` | KV namespace ID |
-| `ADMIN_PASSWORD` | 管理员密码 |
+| `CHANNELS` | `tgsearchers6` |
+| `ENABLED_PLUGINS` | 22 个精选（空字符串=全部 89 个，但不推荐） |
+| `AUTH_ENABLED` | `false` |
+| `AUTH_USERS` | 空 |
+| `PLUGIN_TIMEOUT` | `8` |
 
-**可选（插件加密密钥，不设则用默认值）：**
+## 项目结构
 
-| Secret |
-|---|
-| `PANLIAN_ENCRYPTION_KEY` |
-| `GYING_ENCRYPTION_KEY` |
-| `QQPD_ENCRYPTION_KEY` |
-| `WEIBO_ENCRYPTION_KEY` |
-| `PANLIAN_HASH_SALT` / `GYING_HASH_SALT` / `QQPD_HASH_SALT` / `WEIBO_HASH_SALT` |
+```
+src/
+  index.ts              # Hono 入口
+  config.ts             # 环境变量
+  types.ts              # 类型
+  routes/
+    search.ts           # /api/search
+    auth.ts             # /api/auth/*
+    check.ts            # /api/check/links
+    plugin-panlian.ts   # /panlian/:hash
+    plugin-qqpd.ts      # /qqpd/:hash
+    plugin-gying.ts     # /gying/:hash
+    plugin-weibo.ts     # /weibo/:hash
+  service/
+    search.ts           # 搜索编排：并行、缓存、去重、排序
+    check.ts            # 9 种网盘链接验证
+    kv-session.ts       # KV 会话存储 + AES-GCM
+  plugin/
+    registry.ts         # 插件注册表
+    configs.ts          # 89 个插件 URL 配置
+    config-engine.ts    # 通用解析引擎（JSON + 4层HTML）
+    pansearch.ts        # pansearch.me 专用
+    yunso.ts            # yunso.net 专用
+    alupan.ts           # alupan.net 专用
+pansou-web/             # Vue 3 前端
+```
 
-### 4. 执行部署
+## 搜索算法
 
-Actions → Deploy to Cloudflare → Run workflow。
-
-## 环境变量
-
-所有变量在 `wrangler.toml` `[vars]` 中定义，由 CI 在部署时注入：
-
-| 变量 | 说明 | 默认值 |
-|---|---|---|
-| `CHANNELS` | TG 频道列表 | `tgsearchers6` |
-| `ENABLED_PLUGINS` | 启用的插件（空=全部） | 全部 |
-| `ASYNC_PLUGIN_ENABLED` | 启用插件搜索 | `true` |
-| `PLUGIN_TIMEOUT` | 单插件超时（秒） | `8` |
-| `AUTH_ENABLED` | 开启认证 | `false` |
-| `AUTH_USERS` | 用户 `user:pass,...` | - |
-| `AUTH_JWT_SECRET` | JWT 密钥 | `pansou2cf-secret` |
+- **链接-标题关联**：从 TG 消息正文逐条提取每个链接的具体标题
+- **智能合并**：同键结果按完整度评分（UniqueID、链接数、内容长度、频道）选最优
+- **三维排序**：时间分（0-500）+ 关键词优先分（0-490）+ 插件等级分（-200~1000）
+- **质量过滤**：低质量结果进 `merged_by_type`，高质量进 `results`
+- **密码提取**：正则（`提取码`/`密码`/`pwd`/`访问码`）+ URL 参数（`?pwd=`）
 
 ## 本地开发
 
 ```bash
-npm install
-npm run dev          # Worker: http://localhost:8787
-
-# Vue 前端（可选，生产由 Worker 直接提供静态文件）
-cd pansou-web && npm install && npm run dev
+npm install && npm run dev    # Worker → http://localhost:8787
+cd pansou-web && npm install && npm run dev  # Vue → http://localhost:3000
 ```
-
-## 插件系统
-
-### 专用插件（3 个）
-
-手写站点特定解析逻辑：`pansearch`（Build ID 提取 + JSON API）、`yunso`（HTML 结构化解析）、`alupan`（Article 块解析）
-
-### 配置驱动插件（86 个）
-
-通过 `configs.ts` 统一管理 URL 模板 + 解析模式。通用引擎自动尝试 JSON 解析，失败后回退 4 层 HTML 策略：Article 块 → List 项 → Card 布局 → 链接提取。
-
-### 账号管理插件（4 个）
-
-完整实现 Go 版中的 `PluginWithWebHandler` 接口，使用 KV 替代文件系统持久化会话。认证流程完全对齐 Go 版：
-- Panlian/Gying：获取登录页 Cookie → POST 凭据 → 保存会话
-- QQPD：获取 QR 码 → hash33(ptqrtoken) → 轮询 ptqrlogin → check_sig 取全量 Cookie
-- Weibo：获取 QR 码(qrid) → 轮询 qrcode/check → 4 步 Cookie 初始化
 
 ## License
 

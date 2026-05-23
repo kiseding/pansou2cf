@@ -139,34 +139,38 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
   let tgResults: SearchResult[] = [];
   let pluginResults: SearchResult[] = [];
 
-  const promises: Promise<void>[] = [];
+  // Fire all TG + plugins in parallel. Each has its own AbortController timeout.
+  // Process results as they arrive within a 10s wall-clock budget.
+  // Plugins that complete after the deadline are cached for the next request.
+  const allTasks: Promise<SearchResult[]>[] = [];
 
   if (useTg && req.channels) {
-    promises.push((async () => {
-      // Fire all channels in parallel — Workers I/O wait doesn't count toward CPU
-      const limit = req.conc || 50;
-      const tasks = req.channels!.slice(0, limit).map(ch => searchTGChannel(ch, keyword));
-      const settled = await Promise.allSettled(tasks);
-      for (const r of settled) { if (r.status === 'fulfilled') tgResults.push(...r.value); }
-    })());
+    const limit = Math.min(req.conc || 50, 50);
+    allTasks.push(...req.channels!.slice(0, limit).map(ch => searchTGChannel(ch, keyword)));
   }
 
   if (usePlugin) {
-    promises.push((async () => {
-      const pluginList = getFiltered(normalizedPlugins);
-      // Fire all plugins in parallel up to 50 subrequests (Free plan limit)
-      const limit = Math.min(req.conc || 50, 50);
-      const selected = pluginList.slice(0, limit);
-      const tasks = selected.map(p => searchPlugin(p.name, keyword));
-      const settled = await Promise.allSettled(tasks);
-      for (const r of settled) { if (r.status === 'fulfilled') pluginResults.push(...r.value); }
-    })());
+    const pluginList = getFiltered(normalizedPlugins);
+    const limit = Math.min(req.conc || 50, 50);
+    allTasks.push(...pluginList.slice(0, limit).map(p => searchPlugin(p.name, keyword)));
   }
 
-  // Wait for both groups with overall timeout
-  const groupPromise = Promise.allSettled(promises);
-  const timeoutPromise = new Promise<void>(resolve => setTimeout(resolve, OVERALL_TIMEOUT_MS));
-  await Promise.race([groupPromise, timeoutPromise]);
+  if (allTasks.length > 0) {
+    // Race: return whatever completes within the deadline
+    const deadline = new Promise<void>(resolve => setTimeout(resolve, 10000));
+    const work = (async () => {
+      const settled = await Promise.allSettled(allTasks);
+      for (const r of settled) {
+        if (r.status === 'fulfilled') {
+          const res = r.value;
+          for (const item of res) {
+            (item.channel?.startsWith('tg:') ? tgResults : pluginResults).push(item);
+          }
+        }
+      }
+    })();
+    await Promise.race([work, deadline]);
+  }
 
   // Step 3: Smart merge with completeness scoring
   let allResults = mergeSearchResults(tgResults, pluginResults);

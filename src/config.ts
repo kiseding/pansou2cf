@@ -12,6 +12,17 @@ export interface Env {
   ADMIN_USERNAME?: string;
   ADMIN_PASSWORD?: string;
   REGISTER_CODE?: string;
+  // Plugin encryption keys & salts
+  PANLIAN_ENCRYPTION_KEY?: string;
+  GYING_ENCRYPTION_KEY?: string;
+  QQPD_ENCRYPTION_KEY?: string;
+  WEIBO_ENCRYPTION_KEY?: string;
+  PANLIAN_HASH_SALT?: string;
+  GYING_HASH_SALT?: string;
+  QQPD_HASH_SALT?: string;
+  WEIBO_HASH_SALT?: string;
+  // KV binding for plugin sessions
+  PLUGIN_KV?: KVNamespace;
 }
 
 export interface AppConfig {
@@ -23,6 +34,15 @@ export interface AppConfig {
   authEnabled: boolean;
   authUsers: Map<string, string>;
   authJwtSecret: string;
+  // Plugin config
+  panlianEncryptionKey: string;
+  gyingEncryptionKey: string;
+  qqpdEncryptionKey: string;
+  weiboEncryptionKey: string;
+  panlianHashSalt: string;
+  gyingHashSalt: string;
+  qqpdHashSalt: string;
+  weiboHashSalt: string;
 }
 
 let _config: AppConfig | null = null;
@@ -47,6 +67,14 @@ export function getConfig(env?: any): AppConfig {
     authEnabled: e.AUTH_ENABLED === 'true',
     authUsers,
     authJwtSecret: e.AUTH_JWT_SECRET || 'pansou2cf-secret',
+    panlianEncryptionKey: e.PANLIAN_ENCRYPTION_KEY || 'default-panlian-encryption-key!!',
+    gyingEncryptionKey: e.GYING_ENCRYPTION_KEY || 'gying-secret-key-32bytes-long!!!',
+    qqpdEncryptionKey: e.QQPD_ENCRYPTION_KEY || 'default-32-byte-key-change-me!',
+    weiboEncryptionKey: e.WEIBO_ENCRYPTION_KEY || 'default-32-byte-key-change-me!',
+    panlianHashSalt: e.PANLIAN_HASH_SALT || 'pansou_panlian_secret_2026',
+    gyingHashSalt: e.GYING_HASH_SALT || 'pansou_gying_secret_2025',
+    qqpdHashSalt: e.QQPD_HASH_SALT || 'pansou_qqpd_secret_2025',
+    weiboHashSalt: e.WEIBO_HASH_SALT || 'pansou_weibo_secret_2025',
   };
 
   return _config;

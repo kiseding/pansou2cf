@@ -5,7 +5,10 @@ import { authRoute } from './routes/auth';
 import { checkRoute } from './routes/check';
 import { getFiltered } from './plugin/registry';
 import { bootPlugins } from './plugin/boot';
-import { pluginStubRoute } from './routes/plugin-stubs';
+import { panlianRoute } from './routes/plugin-panlian';
+import { qqpdRoute } from './routes/plugin-qqpd';
+import { gyingRoute } from './routes/plugin-gying';
+import { weiboRoute } from './routes/plugin-weibo';
 bootPlugins();
 
 const app = new Hono();
@@ -48,11 +51,11 @@ app.get('/api/health', (c) => {
   });
 });
 
-// Plugin account management stubs (Vue frontend expects these endpoints)
-app.route('/qqpd', pluginStubRoute('qqpd'));
-app.route('/gying', pluginStubRoute('gying'));
-app.route('/panlian', pluginStubRoute('panlian'));
-app.route('/weibo', pluginStubRoute('weibo'));
+// Plugin account management routes (KV-backed)
+app.route('/qqpd', qqpdRoute());
+app.route('/gying', gyingRoute());
+app.route('/panlian', panlianRoute());
+app.route('/weibo', weiboRoute());
 
 // SPA fallback: for client-side routes, serve index.html
 // Static files (/assets/*, /favicon.ico) are handled by wrangler [assets]

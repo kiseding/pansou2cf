@@ -8,15 +8,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - run: npm install
 
       - name: Inject secrets into wrangler.toml
         run: |
-          sed -i "s|ADMIN_PASSWORD = \"admin\"|ADMIN_PASSWORD = \"${{ secrets.ADMIN_PASSWORD }}\"|g" wrangler.toml
-          sed -i "s|REGISTER_CODE = \"\"|REGISTER_CODE = \"${{ secrets.REGISTER_CODE }}\"|g" wrangler.toml
+          # Admin credentials
+          sed -i "s|PLACEHOLDER_ADMIN_PASSWORD|${{ secrets.ADMIN_PASSWORD }}|g" wrangler.toml
+          sed -i "s|PLACEHOLDER_REGISTER_CODE|${{ secrets.REGISTER_CODE }}|g" wrangler.toml
+          # KV namespace IDs
+          sed -i "s|PLUGIN_KV_ID_PLACEHOLDER|${{ secrets.PLUGIN_KV_ID }}|g" wrangler.toml
+          sed -i "s|PLUGIN_KV_PREVIEW_ID_PLACEHOLDER|${{ secrets.PLUGIN_KV_PREVIEW_ID }}|g" wrangler.toml
+          # Plugin encryption keys (use defaults if secrets not set)
+          test -n "${{ secrets.PANLIAN_ENCRYPTION_KEY }}" && sed -i "s|PANLIAN_ENCRYPTION_KEY = \".*\"|PANLIAN_ENCRYPTION_KEY = \"${{ secrets.PANLIAN_ENCRYPTION_KEY }}\"|g" wrangler.toml || true
+          test -n "${{ secrets.GYING_ENCRYPTION_KEY }}" && sed -i "s|GYING_ENCRYPTION_KEY = \".*\"|GYING_ENCRYPTION_KEY = \"${{ secrets.GYING_ENCRYPTION_KEY }}\"|g" wrangler.toml || true
+          test -n "${{ secrets.QQPD_ENCRYPTION_KEY }}" && sed -i "s|QQPD_ENCRYPTION_KEY = \".*\"|QQPD_ENCRYPTION_KEY = \"${{ secrets.QQPD_ENCRYPTION_KEY }}\"|g" wrangler.toml || true
+          test -n "${{ secrets.WEIBO_ENCRYPTION_KEY }}" && sed -i "s|WEIBO_ENCRYPTION_KEY = \".*\"|WEIBO_ENCRYPTION_KEY = \"${{ secrets.WEIBO_ENCRYPTION_KEY }}\"|g" wrangler.toml || true
+          test -n "${{ secrets.PANLIAN_HASH_SALT }}" && sed -i "s|PANLIAN_HASH_SALT = \".*\"|PANLIAN_HASH_SALT = \"${{ secrets.PANLIAN_HASH_SALT }}\"|g" wrangler.toml || true
+          test -n "${{ secrets.GYING_HASH_SALT }}" && sed -i "s|GYING_HASH_SALT = \".*\"|GYING_HASH_SALT = \"${{ secrets.GYING_HASH_SALT }}\"|g" wrangler.toml || true
+          test -n "${{ secrets.QQPD_HASH_SALT }}" && sed -i "s|QQPD_HASH_SALT = \".*\"|QQPD_HASH_SALT = \"${{ secrets.QQPD_HASH_SALT }}\"|g" wrangler.toml || true
+          test -n "${{ secrets.WEIBO_HASH_SALT }}" && sed -i "s|WEIBO_HASH_SALT = \".*\"|WEIBO_HASH_SALT = \"${{ secrets.WEIBO_HASH_SALT }}\"|g" wrangler.toml || true
 
       - name: Deploy to Cloudflare
         env:

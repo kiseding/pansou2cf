@@ -6,19 +6,17 @@ type TaskFn<T> = () => Promise<T>;
 interface Task<T> {
   fn: TaskFn<T>;
   id: string;
-  priority: number; // lower = higher priority
+  priority: number;
 }
 
 export class DynamicPool<T> {
   private concurrency: number;
-  private queue: Task<T>[];
-  private running = 0;
+  private queue: Task<T>[] = [];
   private results: T[] = [];
-  private deadline: number; // ms timestamp after which we stop
+  private deadline: number;
 
   constructor(concurrency: number, timeoutMs: number = 10000) {
     this.concurrency = concurrency;
-    this.queue = [];
     this.deadline = Date.now() + timeoutMs;
   }
 
@@ -26,17 +24,13 @@ export class DynamicPool<T> {
     this.queue.push({ fn, id, priority });
   }
 
-  // Execute all tasks, calling onResult for each completed task
   async execute(onResult: (id: string, value: T) => void): Promise<T[]> {
-    // Sort by priority (lower first)
     this.queue.sort((a, b) => a.priority - b.priority);
 
-    // Track which tasks we've started
-    const pending = new Set(this.queue.map(t => t.id));
-    let nextIdx = 0;
+    const pending = new Set<Promise<void>>();
+    let idx = 0;
 
-    const runTask = async (task: Task<T>) => {
-      this.running++;
+    const runOne = async (task: Task<T>): Promise<void> => {
       try {
         const result = await task.fn();
         if (Date.now() < this.deadline) {
@@ -44,47 +38,30 @@ export class DynamicPool<T> {
           onResult(task.id, result);
         }
       } catch {
-        // Task failed, skip
-      } finally {
-        this.running--;
-        pending.delete(task.id);
+        // silently skip failed tasks
       }
     };
 
-    // Kick off initial batch
-    const initial = Math.min(this.concurrency, this.queue.length);
-    const started: Promise<void>[] = [];
-    for (let i = 0; i < initial; i++) {
-      started.push(runTask(this.queue[i]));
-      nextIdx = i + 1;
-    }
-
-    // As each task completes, start the next one from the queue
-    while (nextIdx < this.queue.length && Date.now() < this.deadline) {
-      // Wait for any running task to complete
-      if (this.running >= this.concurrency) {
-        await Promise.race(started);
-        // Remove completed promises
-        for (let i = started.length - 1; i >= 0; i--) {
-          const p = started[i];
-          // Check if settled
-          let settled = false;
-          await p.then(() => { settled = true; }).catch(() => { settled = true; });
-          if (settled) started.splice(i, 1);
-        }
+    // Keep pool full until queue empty or deadline passed
+    while (idx < this.queue.length && Date.now() < this.deadline) {
+      // Fill pool up to concurrency
+      while (pending.size < this.concurrency && idx < this.queue.length) {
+        const task = this.queue[idx++];
+        const p = runOne(task).finally(() => pending.delete(p));
+        pending.add(p);
       }
-      // Start next task
-      if (nextIdx < this.queue.length && this.running < this.concurrency && Date.now() < this.deadline) {
-        started.push(runTask(this.queue[nextIdx]));
-        nextIdx++;
+
+      // Wait for at least one task to complete before adding more
+      if (pending.size > 0) {
+        await Promise.race(Array.from(pending));
       }
     }
 
     // Wait for remaining in-flight tasks (up to deadline)
-    if (started.length > 0) {
-      const remaining = Promise.allSettled(started);
-      const deadline = new Promise<void>(r => setTimeout(r, Math.max(0, this.deadline - Date.now())));
-      await Promise.race([remaining, deadline]);
+    if (pending.size > 0) {
+      const remaining = Promise.allSettled(Array.from(pending));
+      const limit = new Promise<void>(r => setTimeout(r, Math.max(0, this.deadline - Date.now())));
+      await Promise.race([remaining, limit]);
     }
 
     return this.results;

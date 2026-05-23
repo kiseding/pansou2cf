@@ -81,8 +81,7 @@ app.get('/api/health', (c) => {
   });
 });
 
-// Plugin diagnostics — test all plugin URLs for reachability
-import { pluginConfigs } from './plugin/configs';
+// Plugin diagnostics — test plugin URLs for reachability
 app.get('/api/debug/plugins', async (c) => {
   const config = getConfig(c.env);
   const all = getFiltered(null);

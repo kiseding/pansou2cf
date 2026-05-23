@@ -48,7 +48,7 @@ async function authGuard(c: any, next: any) {
   }
 
   const token = authHeader.slice(7);
-  const claims = verifyTokenSelf(token, config.authJwtSecret);
+  const claims = await verifyTokenSelf(token, config.authJwtSecret);
   if (!claims) {
     return c.json({ error: '未授权：令牌无效或已过期', code: 'AUTH_TOKEN_INVALID' }, 401);
   }

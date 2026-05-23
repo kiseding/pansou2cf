@@ -15,12 +15,23 @@ async function signToken(user: string, secret: string): Promise<string> {
   return b64header + '.' + b64payload + '.' + b64sig;
 }
 
-function verifyTokenSelf(token: string, secret: string): { user: string } | null {
+async function verifyTokenSelf(token: string, secret: string): Promise<{ user: string } | null> {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const payload = JSON.parse(atob(parts[1]));
     if (payload.exp * 1000 < Date.now()) return null;
+
+    // Verify HMAC-SHA256 signature
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    const data = enc.encode(parts[0] + '.' + parts[1]);
+    // Convert base64url sig to raw bytes
+    const sigB64 = parts[2].replace(/-/g, '+').replace(/_/g, '/');
+    const sigRaw = Uint8Array.from(atob(sigB64), c => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify('HMAC', key, sigRaw, data);
+    if (!valid) return null;
+
     return { user: payload.user };
   } catch { return null; }
 }
@@ -70,7 +81,7 @@ authRoute.post('/verify', async (c) => {
   }
 
   const token = auth.slice(7);
-  const claims = verifyTokenSelf(token, config.authJwtSecret);
+  const claims = await verifyTokenSelf(token, config.authJwtSecret);
   if (!claims) {
     return c.json({ error: '未授权：令牌无效或已过期' }, 401);
   }

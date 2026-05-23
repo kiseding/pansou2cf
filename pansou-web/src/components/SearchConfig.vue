@@ -105,15 +105,15 @@ const loadConfig = () => {
     if (savedChannels) {
       selectedChannels.value = JSON.parse(savedChannels);
     } else {
-      // 默认不选，用户自行勾选
-      selectedChannels.value = [];
+      // 默认全选
+      selectedChannels.value = [...(healthData.value?.channels || [])];
     }
 
     if (savedPlugins) {
       selectedPlugins.value = JSON.parse(savedPlugins);
     } else {
-      // 默认不选，用户自行勾选
-      selectedPlugins.value = [];
+      // 默认全选
+      selectedPlugins.value = [...availablePlugins.value];
     }
 
     if (savedDiskTypes) {

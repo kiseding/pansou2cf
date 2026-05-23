@@ -176,29 +176,29 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
     return !!r.datetime || getKeywordPriority(r.title) > 0 || level <= 2;
   });
 
-  // Cloud type filter
+  // Cloud type filter — applies to both merged_by_type and results
   let finalForMerged = ranked;
   if (req.cloud_types && req.cloud_types.length > 0) {
     finalForMerged = ranked.filter(r =>
       r.links.some(l => req.cloud_types!.includes(l.type))
     );
-    const filteredResultsForMerged = finalForMerged.filter(r => filteredForResults.includes(r));
-    filteredForResults.length = 0;
-    filteredForResults.push(...filteredResultsForMerged);
   }
 
-  // Merge by type — uses ALL results, not just filtered
+  // Merge by type — uses ALL results
   const mergedLinks = mergeResultsByType(finalForMerged, keyword);
 
   const resType = req.res || 'merged_by_type';
+  // Support Go alias: res=merge → merged_by_type
+  const effectiveType = resType === 'merge' ? 'merged_by_type' : resType;
+
   let total: number;
-  if (resType === 'merged_by_type') {
+  if (effectiveType === 'merged_by_type') {
     total = Object.values(mergedLinks).reduce((s, arr) => s + arr.length, 0);
   } else {
     total = filteredForResults.length;
   }
 
-  const response: SearchResponse = resType === 'results'
+  const response: SearchResponse = effectiveType === 'results'
     ? { total, results: filteredForResults.slice(0, 200) }
     : { total, merged_by_type: mergedLinks, results: filteredForResults.slice(0, 200) };
 

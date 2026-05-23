@@ -215,9 +215,15 @@ const handleSearch = async (params: SearchParams) => {
   const hasPlugins = config.plugins.length > 0;
 
   try {
-    // 只用 innerParams，确保 refresh 只传一次
-    // 第一轮：少量插件+频道，快速出结果（conc=5 避免超时）
-    const userParams: SearchParams = { ...innerParams, conc: 5 };
+    // 后台预热：用全部插件搜一次，触发 Worker 端所有插件的 HTTP 请求
+    // 结果不展示，只为让 Worker 热缓存（匹配 Go 版 AsyncSearch 后台 goroutine 机制）
+    if (hasPlugins || hasChannels) {
+      const warmParams: SearchParams = { ...innerParams, conc: 0, src: 'all' };
+      search(warmParams).catch(() => {});
+    }
+
+    // 第一轮：快速出结果（conc=15，约 3s）
+    const userParams: SearchParams = { ...innerParams, conc: 15 };
 
     // 先发起第一次搜索请求（显示结果）
     search(userParams)
@@ -729,7 +735,7 @@ const startSecondAllSearch = (firstSearchCompleteTime: number) => {
   const userParams: SearchParams = {
     ...lastSearchParams.value,
     src: src,
-    conc: 15,  // 第二轮：扩大范围
+    conc: 30,  // 第二轮：更多插件
   };
 
   // 计算需要等待的时间，确保与第一次搜索至少间隔2秒
@@ -778,7 +784,7 @@ const startThirdAllSearch = (secondSearchCompleteTime: number) => {
   const userParams: SearchParams = {
     ...lastSearchParams.value,
     src: src,
-    conc: 30,  // 第三轮：更多插件
+    conc: 60,  // 第三轮：大规模
   };
 
   // 计算需要等待的时间，确保与第二次搜索至少间隔3秒

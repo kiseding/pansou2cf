@@ -104,9 +104,9 @@ const loadConfig = () => {
 
     if (savedChannels) {
       selectedChannels.value = JSON.parse(savedChannels);
-    } else if (healthData.value) {
-      // 默认选中所有官方频道
-      selectedChannels.value = [...healthData.value.channels];
+    } else {
+      // 默认不选，用户自行勾选
+      selectedChannels.value = [];
     }
 
     if (savedPlugins) {
@@ -452,6 +452,9 @@ onMounted(() => {
           </div>
 
           <div class="pane-content">
+          <p class="pane-hint" v-if="selectedChannels.length > 5">⚠️ 已选 {{ selectedChannels.length }} 个，建议不超过 5 个，过多会导致搜索超时</p>
+          <p class="pane-hint" v-else-if="selectedChannels.length === 0">💡 勾选需要的 TG 频道，建议 3-5 个效果最佳</p>
+          <p class="pane-hint" v-else>✅ 已选 {{ selectedChannels.length }} 个（建议 3-5 个）</p>
           <!-- 添加频道输入框 -->
           <div v-if="showChannelInput" class="add-input-group">
             <input

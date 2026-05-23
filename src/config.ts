@@ -53,8 +53,7 @@ export function getConfig(env?: any): AppConfig {
 }
 
 function parsePluginList(env: string | undefined): string[] | null {
-  if (env === undefined) return null;
-  if (env === '') return [];
+  if (env === undefined || env === '') return null; // null = enable all
   return env.split(',').map((s: string) => s.trim()).filter(Boolean);
 }
 

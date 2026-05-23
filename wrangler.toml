@@ -4,14 +4,14 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-AUTH_ENABLED = "false"
+AUTH_ENABLED = "true"
 AUTH_USERS = ""
 AUTH_JWT_SECRET = ""
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin"
 REGISTER_CODE = ""
-CHANNELS = "tgsearchers6"
+CHANNELS = ""
 ASYNC_PLUGIN_ENABLED = "true"
-ENABLED_PLUGINS = "pansearch,yunso,alupan"
+ENABLED_PLUGINS = ""
 ASYNC_RESPONSE_TIMEOUT = "4"
 PLUGIN_TIMEOUT = "8"

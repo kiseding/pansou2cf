@@ -70,6 +70,20 @@ function guessType(url: string): string {
   return 'unknown';
 }
 
+// URLs on these domains are never netdisk links
+const nonNetdiskHosts = /\b(cdn\.|static\.|assets\.|img\.|images\.|css\.|js\.|fonts\.)/i;
+const nonNetdiskExts = /\.(?:js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot|map|json|xml|webp|avif)(?:[?#].*)?$/i;
+
+function isValidNetdiskUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (nonNetdiskHosts.test(parsed.hostname)) return false;
+    if (nonNetdiskExts.test(parsed.pathname)) return false;
+  } catch { return false; }
+  return guessType(url) !== 'unknown';
+}
+
 function normalizeUrl(u: string): string {
   try {
     const parsed = new URL(u);
@@ -104,29 +118,31 @@ function parseJsonResponse(data: any, cfg: PluginConfig): SearchResult[] {
 
   return items.slice(0, 50).map((item: any, idx: number) => {
     const linkUrl = resolveValue(item, urlField);
-    const links: Link[] = [];
-    if (linkUrl) {
-      links.push({ type: guessType(linkUrl), url: linkUrl, password: resolveValue(item, pwdField) });
+    const rawLinks: Link[] = [];
+    if (linkUrl && isValidNetdiskUrl(linkUrl)) {
+      rawLinks.push({ type: guessType(linkUrl), url: linkUrl, password: resolveValue(item, pwdField) });
     }
     // Also check for nested links array
     if (item.links && Array.isArray(item.links)) {
       for (const l of item.links) {
         const lurl = typeof l === 'string' ? l : l.url || l.href || '';
-        if (lurl && !links.some(ex => ex.url === lurl)) {
-          links.push({ type: guessType(lurl), url: lurl, password: l.password || l.pwd || '' });
+        if (lurl && isValidNetdiskUrl(lurl) && !rawLinks.some(ex => ex.url === lurl)) {
+          rawLinks.push({ type: guessType(lurl), url: lurl, password: l.password || l.pwd || '' });
         }
       }
     }
+    // Filter: only include results that have at least one valid netdisk link
+    const links = rawLinks;
     return {
       message_id: cfg.name + '_' + idx,
-      unique_id: linkUrl || cfg.name + '_' + idx,
+      unique_id: links[0]?.url || cfg.name + '_' + idx,
       channel: cfg.name,
       datetime: resolveValue(item, dateField) || new Date().toISOString(),
       title: resolveValue(item, titleField) || cfg.name + '_' + idx,
       content: resolveValue(item, contentField) || '',
       links,
     };
-  });
+  }).filter(r => r.links.length > 0);
 }
 
 function resolveValue(obj: any, field: string): string {
@@ -381,6 +397,10 @@ export async function configSearch(config: PluginConfig, keyword: string): Promi
     const url = config.searchUrl.replace(/\{keyword\}/g, encodeURIComponent(keyword));
     const mode = config.mode || 'auto';
 
+    // Extract the search source domain for same-origin filtering
+    let sourceHost = '';
+    try { sourceHost = new URL(config.searchUrl).hostname; } catch {}
+
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 8000);
     const res = await fetch(url, {
@@ -398,7 +418,7 @@ export async function configSearch(config: PluginConfig, keyword: string): Promi
     if (mode === 'json' || (mode === 'auto' && ct.includes('json'))) {
       try {
         const data = await res.json();
-        return parseJsonResponse(data, config);
+        return parseJsonResponse(data, config).filter(r => filterSameOrigin(r, sourceHost));
       } catch { /* fall through */ }
     }
 
@@ -409,13 +429,25 @@ export async function configSearch(config: PluginConfig, keyword: string): Promi
       try {
         const data = JSON.parse(html);
         if (data && typeof data === 'object') {
-          return parseJsonResponse(data, config);
+          return parseJsonResponse(data, config).filter(r => filterSameOrigin(r, sourceHost));
         }
       } catch { /* not JSON */ }
     }
 
-    return parseHtmlResponse(html, config.name);
+    return parseHtmlResponse(html, config.name).filter(r => filterSameOrigin(r, sourceHost));
   } catch {
     return [];
   }
+}
+
+// Remove results whose links are on the same domain as the search source
+function filterSameOrigin(r: { links: Link[] }, sourceHost: string): boolean {
+  if (!sourceHost) return true;
+  for (const link of r.links) {
+    try {
+      const u = new URL(link.url);
+      if (u.hostname === sourceHost) return false;
+    } catch {}
+  }
+  return true;
 }

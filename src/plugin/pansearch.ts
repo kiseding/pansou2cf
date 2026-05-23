@@ -50,12 +50,15 @@ async function searchPansearchMe(keyword: string): Promise<SearchResult[]> {
 
     return items.slice(0, 50).map((item: any, idx: number) => {
       const links: Link[] = [];
-      if (item.url) {
+      if (item.url && isValidNetdiskUrl(item.url)) {
         links.push({ type: guessType(item.url), url: item.url, password: item.password || '' });
       }
       if (item.links && Array.isArray(item.links)) {
         for (const l of item.links) {
-          links.push({ type: guessType(l.url || l), url: l.url || l, password: l.password || '' });
+          const lurl = l.url || l;
+          if (isValidNetdiskUrl(lurl) && !links.some(ex => ex.url === lurl)) {
+            links.push({ type: guessType(lurl), url: lurl, password: l.password || '' });
+          }
         }
       }
       return {
@@ -65,9 +68,9 @@ async function searchPansearchMe(keyword: string): Promise<SearchResult[]> {
         datetime: item.datetime || item.date || new Date().toISOString(),
         title: item.title || item.name || keyword,
         content: item.content || item.description || '',
-        links: links.length > 0 ? links : [{ type: guessType(item.url || ''), url: item.url || '', password: item.password || '' }],
+        links,
       };
-    });
+    }).filter(r => r.links.length > 0);
   } catch { return []; }
 }
 
@@ -94,30 +97,43 @@ async function searchGeneric(keyword: string, url: string, source: string): Prom
   } catch { return []; }
 }
 
+// Known netdisk URL patterns — only these are valid results
+const netdiskPatterns: Array<{ re: RegExp; type: string }> = [
+  { re: /https?:\/\/pan\.quark\.cn\/s\/[0-9A-Za-z]+/g, type: 'quark' },
+  { re: /https?:\/\/(?:www\.)?aliyundrive\.com\/s\/[0-9A-Za-z]+/g, type: 'aliyun' },
+  { re: /https?:\/\/www\.alipan\.com\/s\/[0-9A-Za-z]+/g, type: 'aliyun' },
+  { re: /https?:\/\/pan\.baidu\.com\/s\/[0-9A-Za-z_-]+/g, type: 'baidu' },
+  { re: /https?:\/\/www\.123pan\.com\/s\/[0-9A-Za-z]+/g, type: '123' },
+  { re: /https?:\/\/pan\.xunlei\.com\/s\/[0-9A-Za-z]+/g, type: 'xunlei' },
+  { re: /https?:\/\/drive\.uc\.cn\/s\/[0-9A-Za-z]+/g, type: 'uc' },
+  { re: /https?:\/\/115\.com\/s\/[0-9A-Za-z]+/g, type: '115' },
+  { re: /https?:\/\/cloud\.189\.cn\/t\/[0-9A-Za-z]+/g, type: 'tianyi' },
+  { re: /https?:\/\/caiyun\.139\.com\/w\/i\/[0-9A-Za-z]+/g, type: 'mobile' },
+];
+
 function extractLinks(html: string, source: string, keyword: string): SearchResult[] {
   const results: SearchResult[] = [];
   const seen = new Set<string>();
-
-  // Find all URLs in the page
-  const urlRegex = /https?:\/\/[^\s"'<>]{10,500}/g;
-  let m;
   let idx = 0;
-  while ((m = urlRegex.exec(html)) !== null && idx < 30) {
-    const u = m[0].replace(/&amp;/g, '&');
-    if (seen.has(u)) continue;
-    seen.add(u);
-    const type = guessType(u);
-    if (type === 'unknown' && u.length < 50) continue;
-    results.push({
-      message_id: source + '_' + idx,
-      unique_id: u,
-      channel: source,
-      datetime: new Date().toISOString(),
-      title: keyword + ' - ' + (type !== 'unknown' ? type : u.split('/')[2] || ''),
-      content: '',
-      links: [{ type, url: u, password: '' }],
-    });
-    idx++;
+
+  for (const { re, type } of netdiskPatterns) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(html)) !== null && idx < 30) {
+      const u = m[0].replace(/&amp;/g, '&');
+      if (seen.has(u)) continue;
+      seen.add(u);
+      results.push({
+        message_id: source + '_' + idx,
+        unique_id: u,
+        channel: source,
+        datetime: new Date().toISOString(),
+        title: keyword + ' - ' + type,
+        content: '',
+        links: [{ type, url: u, password: '' }],
+      });
+      idx++;
+    }
   }
   return results;
 }
@@ -149,6 +165,20 @@ function guessType(url: string): string {
   if (u.includes('drive.uc') || u.includes('uc.cn')) return 'uc';
   if (u.includes('123pan') || u.includes('123.cn')) return '123';
   return 'unknown';
+}
+
+function isValidNetdiskUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const hn = parsed.hostname;
+    // Block CDN/static/asset URLs
+    if (/\b(cdn|static|assets|img|images|css|js|fonts)\./i.test(hn)) return false;
+    // Block non-netdisk file extensions
+    if (/\.(?:js|css|png|jpe?g|gif|svg|ico|woff2?|ttf|eot|map|webp|avif)(?:[?#]|$)/i.test(parsed.pathname)) return false;
+    // Must match at least one netdisk type
+    return guessType(url) !== 'unknown';
+  } catch { return false; }
 }
 
 register(pansearchPlugin);

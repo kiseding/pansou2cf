@@ -19,7 +19,6 @@ jobs:
         run: |
           # Admin credentials
           sed -i "s|PLACEHOLDER_ADMIN_PASSWORD|${{ secrets.ADMIN_PASSWORD }}|g" wrangler.toml
-          sed -i "s|PLACEHOLDER_REGISTER_CODE|${{ secrets.REGISTER_CODE }}|g" wrangler.toml
           # KV namespace ID
           sed -i "s|PLUGIN_KV_ID_PLACEHOLDER|${{ secrets.PLUGIN_KV_ID }}|g" wrangler.toml
           # Plugin encryption keys (use defaults if secrets not set)

@@ -11,7 +11,6 @@ export interface Env {
   AUTH_JWT_SECRET?: string;
   ADMIN_USERNAME?: string;
   ADMIN_PASSWORD?: string;
-  REGISTER_CODE?: string;
   // Plugin encryption keys & salts
   PANLIAN_ENCRYPTION_KEY?: string;
   GYING_ENCRYPTION_KEY?: string;

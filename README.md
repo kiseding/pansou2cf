@@ -153,7 +153,6 @@ npx wrangler kv:namespace create PLUGIN_KV
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID |
 | `PLUGIN_KV_ID` | KV namespace ID |
 | `ADMIN_PASSWORD` | 管理员密码 |
-| `REGISTER_CODE` | 注册邀请码（可为空） |
 
 **可选（插件加密密钥，不设则用默认值）：**
 

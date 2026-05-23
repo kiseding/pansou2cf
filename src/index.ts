@@ -7,10 +7,9 @@ import { getFiltered } from './plugin/registry';
 import { homePage } from './pages/home';
 import uiJs from './pages/ui';
 
-// Import all plugins to trigger registration
-import './plugin/pansearch';
-import './plugin/yunso';
-import './plugin/alupan';
+// Boot all plugins (config-driven + dedicated)
+import { bootPlugins } from './plugin/boot';
+bootPlugins();
 
 const app = new Hono();
 

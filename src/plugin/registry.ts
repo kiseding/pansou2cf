@@ -22,8 +22,7 @@ export function getByName(name: string): AsyncPlugin | undefined {
 }
 
 export function getFiltered(enabledList: string[] | null): AsyncPlugin[] {
-  const all = getAll();
-  if (enabledList === null) return []; // not configured
-  if (enabledList.length === 0) return []; // explicitly empty
-  return all.filter(p => enabledList.includes(p.name));
+  if (enabledList === null) return getAll();
+  if (enabledList.length === 0) return [];
+  return getAll().filter(p => enabledList.includes(p.name));
 }

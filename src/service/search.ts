@@ -2,10 +2,9 @@ import { getConfig } from '../config';
 import { getFiltered, getByName } from '../plugin/registry';
 import type { SearchRequest, SearchResponse, SearchResult, MergedLinks, MergedLink } from '../types';
 
-// Import all plugins to trigger registration
-import '../plugin/pansearch';
-import '../plugin/yunso';
-import '../plugin/alupan';
+// Import boot to trigger plugin registration
+import { bootPlugins } from '../plugin/boot';
+bootPlugins();
 
 const PLUGIN_TIMEOUT_MS = 8000;
 const TG_TIMEOUT_MS = 5000;

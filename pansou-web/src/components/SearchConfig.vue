@@ -452,9 +452,7 @@ onMounted(() => {
           </div>
 
           <div class="pane-content">
-          <p class="pane-hint" v-if="selectedChannels.length > 5">⚠️ 已选 {{ selectedChannels.length }} 个，建议不超过 5 个，过多会导致搜索超时</p>
-          <p class="pane-hint" v-else-if="selectedChannels.length === 0">💡 勾选需要的 TG 频道，建议 3-5 个效果最佳</p>
-          <p class="pane-hint" v-else>✅ 已选 {{ selectedChannels.length }} 个（建议 3-5 个）</p>
+          <p class="pane-hint">已选 {{ selectedChannels.length }} 个 TG 频道（分轮渐进搜索，不会超时）</p>
           <!-- 添加频道输入框 -->
           <div v-if="showChannelInput" class="add-input-group">
             <input
@@ -519,9 +517,7 @@ onMounted(() => {
           </div>
 
           <div class="pane-content">
-            <p class="pane-hint" v-if="selectedPlugins.length > 20">⚠️ 已选 {{ selectedPlugins.length }} 个，建议不超过 20 个，过多会导致搜索超时</p>
-            <p class="pane-hint" v-else-if="selectedPlugins.length === 0">💡 勾选需要的插件，建议 10-20 个效果最佳</p>
-            <p class="pane-hint" v-else>✅ 已选 {{ selectedPlugins.length }} 个（建议 10-20 个）</p>
+            <p class="pane-hint">已选 {{ selectedPlugins.length }} 个插件（分轮渐进搜索，不会超时）</p>
             <div class="items-grid">
               <div
                 v-for="plugin in availablePlugins"

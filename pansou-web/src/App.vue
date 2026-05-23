@@ -171,7 +171,7 @@ const checkConfig = () => {
     if (backendHealth.value) {
       return {
         channels: backendHealth.value.channels || [],
-        plugins: backendHealth.value.plugins || []
+        plugins: backendHealth.value.all_plugins || backendHealth.value.plugins || []
       };
     }
     
@@ -992,7 +992,7 @@ const handleLogout = async () => {
 const checkQQPDPlugin = () => {
   try {
     // 1. 检查后端是否支持QQPD（使用缓存的健康状态）
-    const backendSupportsQQPD = backendHealth.value?.plugins?.includes('qqpd') || false;
+    const backendSupportsQQPD = (backendHealth.value?.all_plugins || backendHealth.value?.plugins)?.includes('qqpd') || false;
     
     // 2. 如果后端不支持，直接隐藏
     if (!backendSupportsQQPD) {
@@ -1027,7 +1027,7 @@ const checkQQPDPlugin = () => {
 const checkGyingPlugin = () => {
   try {
     // 1. 检查后端是否支持Gying（使用缓存的健康状态）
-    const backendSupportsGying = backendHealth.value?.plugins?.includes('gying') || false;
+    const backendSupportsGying = (backendHealth.value?.all_plugins || backendHealth.value?.plugins)?.includes('gying') || false;
     
     // 2. 如果后端不支持，直接隐藏
     if (!backendSupportsGying) {
@@ -1061,7 +1061,7 @@ const checkGyingPlugin = () => {
 // 检查盘链插件是否启用
 const checkPanlianPlugin = () => {
   try {
-    const backendSupportsPanlian = backendHealth.value?.plugins?.includes('panlian') || false;
+    const backendSupportsPanlian = (backendHealth.value?.all_plugins || backendHealth.value?.plugins)?.includes('panlian') || false;
 
     if (!backendSupportsPanlian) {
       isPanlianEnabled.value = false;
@@ -1090,7 +1090,7 @@ const checkPanlianPlugin = () => {
 // 检查Weibo插件是否启用
 const checkWeiboPlugin = () => {
   try {
-    const backendSupportsWeibo = backendHealth.value?.plugins?.includes('weibo') || false;
+    const backendSupportsWeibo = (backendHealth.value?.all_plugins || backendHealth.value?.plugins)?.includes('weibo') || false;
     
     if (!backendSupportsWeibo) {
       isWeiboEnabled.value = false;

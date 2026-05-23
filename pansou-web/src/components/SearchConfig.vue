@@ -65,7 +65,7 @@ const allChannels = computed(() => {
 
 const availablePlugins = computed(() => {
   if (!healthData.value) return [];
-  return healthData.value.plugins || [];
+  return (healthData.value as any).all_plugins || healthData.value.plugins || [];
 });
 
 // 统计信息
@@ -111,9 +111,9 @@ const loadConfig = () => {
 
     if (savedPlugins) {
       selectedPlugins.value = JSON.parse(savedPlugins);
-    } else if (healthData.value) {
-      // 默认选中所有插件
-      selectedPlugins.value = [...healthData.value.plugins];
+    } else {
+      // 默认不选，用户自行勾选
+      selectedPlugins.value = [];
     }
 
     if (savedDiskTypes) {
@@ -516,6 +516,9 @@ onMounted(() => {
           </div>
 
           <div class="pane-content">
+            <p class="pane-hint" v-if="selectedPlugins.length > 20">⚠️ 已选 {{ selectedPlugins.length }} 个，建议不超过 20 个，过多会导致搜索超时</p>
+            <p class="pane-hint" v-else-if="selectedPlugins.length === 0">💡 勾选需要的插件，建议 10-20 个效果最佳</p>
+            <p class="pane-hint" v-else>✅ 已选 {{ selectedPlugins.length }} 个（建议 10-20 个）</p>
             <div class="items-grid">
               <div
                 v-for="plugin in availablePlugins"

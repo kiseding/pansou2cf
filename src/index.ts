@@ -63,12 +63,18 @@ app.route('/api/check', checkRoute);
 
 app.get('/api/health', (c) => {
   const config = getConfig(c.env);
-  const plugins = getFiltered(config.enabledPlugins);
+  const allPlugins = getFiltered(null); // ALL registered plugins
+  const enabledPlugins = getFiltered(config.enabledPlugins); // currently enabled
   return c.json({
     status: 'ok', auth_enabled: config.authEnabled,
     plugins_enabled: config.asyncPluginEnabled,
     channels: config.channels, channels_count: config.channels.length,
-    plugin_count: plugins.length, plugins: plugins.map(p => p.name),
+    // All available plugins (for frontend config UI)
+    all_plugins: allPlugins.map(p => p.name),
+    all_plugin_count: allPlugins.length,
+    // Currently enabled (subset)
+    enabled_plugins: enabledPlugins.map(p => p.name),
+    enabled_plugin_count: enabledPlugins.length,
   });
 });
 

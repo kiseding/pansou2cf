@@ -59,10 +59,17 @@ interface ApiResponse<T> {
 export interface HealthStatus {
   status: string;
   plugins_enabled: boolean;
-  plugin_count: number;
-  plugins: string[];
   channels: string[];
   auth_enabled?: boolean;
+  // Full list of all available plugins (for config UI)
+  all_plugins?: string[];
+  all_plugin_count?: number;
+  // Currently enabled plugins
+  enabled_plugins?: string[];
+  enabled_plugin_count?: number;
+  // Deprecated: use all_plugins or enabled_plugins
+  plugins?: string[];
+  plugin_count?: number;
 }
 
 // 登录请求参数

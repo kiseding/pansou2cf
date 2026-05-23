@@ -80,7 +80,8 @@ export function getConfig(env?: any): AppConfig {
 }
 
 function parsePluginList(env: string | undefined): string[] | null {
-  if (env === undefined || env === '') return null; // null = enable all
+  if (env === undefined) return null; // not set at all → enable all (backward compat)
+  if (env === '') return []; // explicitly empty → none enabled, user picks in UI
   return env.split(',').map((s: string) => s.trim()).filter(Boolean);
 }
 

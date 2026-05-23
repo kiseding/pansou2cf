@@ -216,22 +216,9 @@ const handleSearch = async (params: SearchParams) => {
 
   try {
     // 只用 innerParams，确保 refresh 只传一次
-    const userParams: SearchParams = { ...innerParams };
-    
-    // 如果同时启用了TG和插件，立即发起后台预热搜索（忽略结果）
-    if (hasChannels && hasPlugins) {
-      const preloadParams: SearchParams = { 
-        ...lastSearchParams.value,
-        src: 'all'  // 后台预热搜索使用 all
-      };
-      
-      // 后台预热搜索，仅用于触发后端插件异步缓存，不处理结果
-      search(preloadParams)
-        .catch(error => {
-          console.warn('后台预热搜索失败（不影响主搜索）:', error);
-        });
-    }
-    
+    // 第一轮：少量插件+频道，快速出结果（conc=5 避免超时）
+    const userParams: SearchParams = { ...innerParams, conc: 5 };
+
     // 先发起第一次搜索请求（显示结果）
     search(userParams)
       .then(firstResponse => {
@@ -739,11 +726,12 @@ const startSecondAllSearch = (firstSearchCompleteTime: number) => {
   
   // 第二次搜索：根据完整配置设置src
   const src = calculateSrcForFullSearch();
-  const userParams: SearchParams = { 
+  const userParams: SearchParams = {
     ...lastSearchParams.value,
-    src: src  // 使用完整配置的src
+    src: src,
+    conc: 15,  // 第二轮：扩大范围
   };
-  
+
   // 计算需要等待的时间，确保与第一次搜索至少间隔2秒
   const currentTime = Date.now();
   const timeElapsedSinceFirstSearch = currentTime - firstSearchCompleteTime;
@@ -787,11 +775,12 @@ const startThirdAllSearch = (secondSearchCompleteTime: number) => {
   
   // 第三次搜索：根据完整配置设置src
   const src = calculateSrcForFullSearch();
-  const userParams: SearchParams = { 
+  const userParams: SearchParams = {
     ...lastSearchParams.value,
-    src: src  // 使用完整配置的src
+    src: src,
+    conc: 30,  // 第三轮：更多插件
   };
-  
+
   // 计算需要等待的时间，确保与第二次搜索至少间隔3秒
   const currentTime = Date.now();
   const timeElapsedSinceSecondSearch = currentTime - secondSearchCompleteTime;
@@ -844,11 +833,12 @@ const startFourthAllSearch = (thirdSearchCompleteTime: number) => {
   
   // 第四次搜索：根据完整配置设置src
   const src = calculateSrcForFullSearch();
-  const userParams: SearchParams = { 
+  const userParams: SearchParams = {
     ...lastSearchParams.value,
-    src: src  // 使用完整配置的src
+    src: src,
+    conc: 0,  // 第四轮：剩余全部
   };
-  
+
   // 计算需要等待的时间，确保与第三次搜索至少间隔3秒
   const currentTime = Date.now();
   const timeElapsedSinceThirdSearch = currentTime - thirdSearchCompleteTime;

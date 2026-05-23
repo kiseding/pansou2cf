@@ -46,6 +46,7 @@ export interface SearchParams {
   channels?: string;
   cloud_types?: string;
   ext?: string;
+  conc?: number;
 }
 
 // API响应包装类型

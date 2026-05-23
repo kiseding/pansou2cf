@@ -147,10 +147,12 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
   if (usePlugin) {
     promises.push((async () => {
       const pluginList = getFiltered(normalizedPlugins);
-      const conc = Math.min(req.conc || 10, 20);
-      // Run ALL plugins (not just first N), concurrency controls parallelism
-      const tasks = pluginList.map(p => () => searchPlugin(p.name, keyword));
-      const all = await runWithConcurrency(tasks, conc);
+      const conc = req.conc || 0;
+      // conc=0 means all plugins; conc=N runs first N plugins for progressive search
+      const selected = conc > 0 ? pluginList.slice(0, conc) : pluginList;
+      const batchSize = Math.min(conc || 20, 20); // concurrency within batch
+      const tasks = selected.map(p => () => searchPlugin(p.name, keyword));
+      const all = await runWithConcurrency(tasks, batchSize);
       pluginResults = all.flat();
     })());
   }

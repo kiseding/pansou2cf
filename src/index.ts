@@ -3,7 +3,7 @@ import { getConfig } from './config';
 import { searchRoute } from './routes/search';
 import { authRoute, verifyTokenSelf } from './routes/auth';
 import { checkRoute } from './routes/check';
-import { getFiltered } from './plugin/registry';
+import { getFiltered, getByName } from './plugin/registry';
 import { bootPlugins } from './plugin/boot';
 import { panlianRoute } from './routes/plugin-panlian';
 import { qqpdRoute } from './routes/plugin-qqpd';
@@ -78,6 +78,46 @@ app.get('/api/health', (c) => {
     // Currently enabled (subset)
     enabled_plugins: enabledPlugins.map(p => p.name),
     enabled_plugin_count: enabledPlugins.length,
+  });
+});
+
+// Plugin diagnostics — test all plugin URLs for reachability
+import { pluginConfigs } from './plugin/configs';
+app.get('/api/debug/plugins', async (c) => {
+  const config = getConfig(c.env);
+  const all = getFiltered(null);
+  const names = all.map(p => p.name);
+
+  // Test first 10 plugins (to avoid overwhelming the worker)
+  const testList = names.slice(0, 10);
+  const results: Array<{ name: string; ok: boolean; status: number; time_ms: number; result_count: number }> = [];
+
+  const tasks = testList.map(name => async () => {
+    const plugin = getByName(name);
+    if (!plugin) return { name, ok: false, status: 0, time_ms: 0, result_count: 0 };
+    const start = Date.now();
+    try {
+      const res = await plugin.search('test');
+      return { name, ok: true, status: 200, time_ms: Date.now() - start, result_count: res.length };
+    } catch {
+      return { name, ok: false, status: 0, time_ms: Date.now() - start, result_count: 0 };
+    }
+  });
+
+  // Run 3 at a time
+  for (let i = 0; i < tasks.length; i += 3) {
+    const batch = tasks.slice(i, i + 3);
+    const batchResults = await Promise.allSettled(batch.map(t => t()));
+    for (const r of batchResults) {
+      if (r.status === 'fulfilled') results.push(r.value);
+    }
+  }
+
+  return c.json({
+    tested_count: results.length,
+    total_plugins: names.length,
+    reachable: results.filter(r => r.ok).length,
+    results,
   });
 });
 

@@ -9,7 +9,6 @@ directory = "./pansou-web/dist"
 [[kv_namespaces]]
 binding = "PLUGIN_KV"
 id = "PLUGIN_KV_ID_PLACEHOLDER"
-preview_id = "PLUGIN_KV_PREVIEW_ID_PLACEHOLDER"
 
 [vars]
 AUTH_ENABLED = "false"

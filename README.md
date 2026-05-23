@@ -134,12 +134,11 @@ GET /api/health
 
 ### 2. 创建 Cloudflare KV Namespace
 
-在 Cloudflare 控制台 → Workers & Pages → KV → 创建命名空间，命名为 `PLUGIN_KV`。记下 ID 和 Preview ID。
+在 Cloudflare 控制台 → Workers & Pages → KV → 创建命名空间，命名为 `PLUGIN_KV`。记下 ID。
 
 或通过 CLI：
 ```bash
 npx wrangler kv:namespace create PLUGIN_KV
-npx wrangler kv:namespace create PLUGIN_KV --preview true
 ```
 
 ### 3. 配置 GitHub Secrets
@@ -152,8 +151,7 @@ npx wrangler kv:namespace create PLUGIN_KV --preview true
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | API Token（Edit Cloudflare Workers 模板） |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID |
-| `PLUGIN_KV_ID` | KV namespace 生产 ID |
-| `PLUGIN_KV_PREVIEW_ID` | KV namespace Preview ID |
+| `PLUGIN_KV_ID` | KV namespace ID |
 | `ADMIN_PASSWORD` | 管理员密码 |
 | `REGISTER_CODE` | 注册邀请码（可为空） |
 

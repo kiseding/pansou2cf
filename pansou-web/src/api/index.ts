@@ -3,7 +3,7 @@ import type { SearchResponse, LinkCheckItem, LinkCheckResponse } from '@/types';
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 10000
+  timeout: 30000
 });
 
 // 请求拦截器 - 自动添加token

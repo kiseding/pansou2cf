@@ -18,7 +18,7 @@ ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "PLACEHOLDER_ADMIN_PASSWORD"
 CHANNELS = ""
 ASYNC_PLUGIN_ENABLED = "true"
-ENABLED_PLUGINS = ""
+ENABLED_PLUGINS = "pansearch,yunso,alupan,haisou,sousou,jupansou,miaoso,sdso,panta,quarksoo,pan666,cyg,feikuai,melost,mikuclub,zhizhen,yunsou,ahhhhfs,susu,thepiratebay,duoduo,erxiao"
 ASYNC_RESPONSE_TIMEOUT = "4"
 PLUGIN_TIMEOUT = "8"
 # Plugin encryption keys (change in production via GitHub Secrets)

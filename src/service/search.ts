@@ -46,9 +46,9 @@ const CLOUD_DISK_NAMES = new Set([
 
 // ── Cache (Cloudflare Cache API) ──
 
-function cacheKey(kw: string, src: string, plugins?: string[]): string {
+function cacheKey(kw: string, src: string, plugins: string[] | null | undefined, conc: number): string {
   const p = plugins?.sort().join(',') || 'all';
-  return `pansou:${kw.toLowerCase()}:${src}:${p}`;
+  return `pansou:${kw.toLowerCase()}:${src}:${p}:c${conc}`;
 }
 
 async function getCached(key: string): Promise<SearchResponse | null> {
@@ -118,7 +118,7 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
 
   // Cache lookup for non-refresh requests
   if (!req.refresh) {
-    const ck = cacheKey(keyword, src, req.plugins ?? undefined);
+    const ck = cacheKey(keyword, src, req.plugins ?? undefined, req.conc || 0);
     const cached = await getCached(ck);
     if (cached) return cached;
   }
@@ -206,7 +206,7 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
     : { total, merged_by_type: mergedLinks, results: filteredForResults.slice(0, 200) };
 
   // Cache the result
-  const ck = cacheKey(keyword, src, req.plugins ?? undefined);
+  const ck = cacheKey(keyword, src, req.plugins ?? undefined, req.conc || 0);
   (async () => { try { await setCached(ck, response); } catch {} })();
 
   return response;
@@ -215,13 +215,23 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
 // ── TG Channel ──
 
 async function searchTGChannel(channel: string, keyword: string): Promise<SearchResult[]> {
+  // Try t.me/s/ first (Go's native approach), fallback to pages.dev
+  const results = await tryTMeSearch(channel, keyword);
+  if (results.length > 0) return results;
+  return tryPagesDevSearch(channel, keyword);
+}
+
+async function tryTMeSearch(channel: string, keyword: string): Promise<SearchResult[]> {
   try {
-    // Go uses: https://t.me/s/{channel}?q={keyword}
     const url = `https://t.me/s/${channel}?q=${encodeURIComponent(keyword)}`;
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), TG_TIMEOUT_MS);
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
       signal: ctrl.signal,
     });
     clearTimeout(t);
@@ -231,69 +241,84 @@ async function searchTGChannel(channel: string, keyword: string): Promise<Search
   } catch { return []; }
 }
 
-// Parse t.me/s/ HTML messages to extract netdisk links
+async function tryPagesDevSearch(channel: string, keyword: string): Promise<SearchResult[]> {
+  try {
+    const url = `https://${channel}.pages.dev/search?q=${encodeURIComponent(keyword)}`;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), TG_TIMEOUT_MS);
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'PanSou/2.0' },
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) return [];
+    const data = await res.json() as any;
+    const items = data?.results || data?.data || [];
+    if (!Array.isArray(items)) return [];
+    return items.slice(0, 20).map((item: any, idx: number) => ({
+      message_id: item.message_id || `${channel}_${idx}`,
+      unique_id: item.unique_id || item.url || `${channel}_${idx}`,
+      channel: `tg:${channel}`,
+      datetime: item.datetime || new Date().toISOString(),
+      title: item.title || 'TG_' + idx,
+      content: item.content || '',
+      links: item.links || [],
+      images: item.images || [],
+    }));
+  } catch { return []; }
+}
+
+// Parse t.me/s/ HTML — matching Go's goquery selectors:
+// doc.Find(".tgme_widget_message_wrap").Each -> .tgme_widget_message[data-post] -> .tgme_widget_message_text, time[datetime]
 function parseTelegramHTML(html: string, channel: string): SearchResult[] {
   const results: SearchResult[] = [];
-  // Each message is in a div.tgme_widget_message_wrap
-  const msgRe = /<div\s+class="tgme_widget_message_wrap[^"]*"\s*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/gi;
-  // Simpler: find message containers with data-post attribute
-  const msgRe2 = /<div\s+class="tgme_widget_message[^"]*"\s+data-post="([^"]*)"[^>]*>([\s\S]*?)(?=<div\s+class="tgme_widget_message[^"]*"\s+data-post="|$)/gi;
+  // Split by message wraps — each contains one message
+  const wraps = html.split(/<div\s+class="tgme_widget_message_wrap/gi).slice(1);
 
-  let m;
-  let idx = 0;
-  while ((m = msgRe2.exec(html)) !== null && idx < 50) {
-    const postId = m[1];
-    const msgHTML = m[2];
+  for (let idx = 0; idx < wraps.length && idx < 50; idx++) {
+    const wrap = wraps[idx];
+    // Find the message div with data-post
+    const msgMatch = wrap.match(/<div\s+class="tgme_widget_message\b[^"]*"\s+data-post="([^"]*)"/i);
+    if (!msgMatch) continue;
+    const postId = msgMatch[1];
 
-    // Extract text content from .tgme_widget_message_text
-    const textMatch = msgHTML.match(/<div\s+class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-    const content = textMatch ? textMatch[1].replace(/<[^>]*>/g, '\n').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim() : '';
+    // Get text content from .tgme_widget_message_text
+    const textMatch = wrap.match(/<div\s+class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    if (!textMatch) continue;
+    const rawText = textMatch[1];
+    const content = rawText.replace(/<[^>]*>/g, '\n').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
 
-    // Extract links from message text
+    // Extract netdisk links
     const links = extractLinksFromText(content);
-    if (links.length === 0) {
-      // Also check raw HTML for netdisk URLs
-      const rawLinks = extractLinksFromText(msgHTML);
-      links.push(...rawLinks);
-    }
-    // Deduplicate
-    const seenUrls = new Set<string>();
-    const uniqueLinks = links.filter(l => {
-      if (seenUrls.has(l.url)) return false;
-      seenUrls.add(l.url);
-      return true;
-    });
+    if (links.length === 0) continue;
 
-    if (uniqueLinks.length === 0) continue;
+    // Dedup
+    const seen = new Set<string>();
+    const unique = links.filter(l => { if (seen.has(l.url)) return false; seen.add(l.url); return true; });
+    if (unique.length === 0) continue;
 
-    // Extract datetime from time tag
-    const timeMatch = msgHTML.match(/<time[^>]*datetime="([^"]*)"/);
+    // Datetime from <time datetime="...">
+    const timeMatch = wrap.match(/<time[^>]*datetime="([^"]*)"/i);
     const datetime = timeMatch?.[1] || new Date().toISOString();
 
-    // Title = first line of content
-    const title = content.split('\n')[0]?.trim().slice(0, 80) || `tg_${idx}`;
+    // Title = first meaningful line
+    const title = content.split('\n')[0]?.replace(/^[@\s\d./#_-]+/, '').trim().slice(0, 80) || `tg_${idx}`;
 
-    // Extract images
+    // Images (skip emoji/icons)
     const images: string[] = [];
     const imgRe = /<img[^>]*src="([^"]*)"[^>]*>/gi;
-    let imgM;
-    while ((imgM = imgRe.exec(msgHTML)) !== null) {
-      if (!imgM[1].includes('emoji') && !imgM[1].includes('icon')) {
-        images.push(imgM[1]);
-      }
+    let im;
+    while ((im = imgRe.exec(wrap)) !== null) {
+      if (!/(?:emoji|icon|logo)/i.test(im[1])) images.push(im[1]);
     }
 
     results.push({
-      message_id: postId,
-      unique_id: postId,
-      channel: `tg:${channel}`,
-      datetime,
-      title,
+      message_id: postId, unique_id: postId,
+      channel: `tg:${channel}`, datetime, title,
       content: content.slice(0, 500),
-      links: uniqueLinks.map(l => ({ type: l.type, url: l.url, password: l.password })),
+      links: unique.map(l => ({ type: l.type, url: l.url, password: l.password })),
       images,
     });
-    idx++;
   }
   return results;
 }

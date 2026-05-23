@@ -584,6 +584,17 @@ function mergeResultsByType(results: SearchResult[], keyword: string): MergedLin
     }
 
     for (const link of r.links) {
+      // Fallback: extract password from URL query params if not already set
+      if (!link.password && link.url) {
+        try {
+          const up = new URL(link.url);
+          for (const k of ['pwd', 'pass', 'password', 'code']) {
+            const v = up.searchParams.get(k);
+            if (v) { link.password = v; break; }
+          }
+        } catch {}
+      }
+
       // Determine per-link title (Go: lines 1060-1080)
       let title = r.title;
       if (link.work_title) {

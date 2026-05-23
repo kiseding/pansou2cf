@@ -36,22 +36,33 @@ const linkPatterns: Array<{ re: RegExp; type: string }> = [
 ];
 
 const pwdPatterns = [
-  /提取码[:：]\s*([0-9A-Za-z]{4,8})/gi,
-  /密码[:：]\s*([0-9A-Za-z]{4,8})/gi,
-  /pwd\s*[=:：]\s*([0-9A-Za-z]{4,8})/gi,
-  /访问码[:：]\s*([0-9A-Za-z]{4,8})/gi,
-  /code\s*[=:：]\s*([0-9A-Za-z]{4,8})/gi,
+  /提取码[:：]?\s*([0-9A-Za-z]+)/gi,
+  /密码[:：]?\s*([0-9A-Za-z]+)/gi,
+  /pwd\s*[=:：]\s*([0-9A-Za-z]+)/gi,
+  /访问码[:：]?\s*([0-9A-Za-z]+)/gi,
+  /code\s*[=:：]\s*([0-9A-Za-z]+)/gi,
 ];
 
 function htmlDecode(s: string): string {
   return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').replace(/&#x27;/g, "'");
 }
 
-function extractPassword(text: string): string {
+function extractPassword(text: string, url?: string): string {
+  // 1. Check surrounding text with regex patterns
   for (const re of pwdPatterns) {
     re.lastIndex = 0;
     const m = re.exec(text);
     if (m) return m[1];
+  }
+  // 2. Check URL query params (matching Go yunso/pansearch logic)
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      for (const key of ['pwd', 'pass', 'password', 'code', 'accessCode']) {
+        const val = parsed.searchParams.get(key);
+        if (val) return val;
+      }
+    } catch {}
   }
   return '';
 }
@@ -207,8 +218,7 @@ function extractFromArticleBlocks(html: string, source: string): SearchResult[] 
     const note = noteMatch ? htmlDecode(noteMatch[1].replace(/<[^>]*>/g, '').trim()) : '';
 
     const links = extractLinks(block);
-    const pwd = extractPassword(block);
-
+    const pwd = extractPassword(block, links[0]?.url);
     if (links.length > 0 && title) {
       if (pwd) links.forEach(l => l.password = l.password || pwd);
       results.push({
@@ -235,8 +245,7 @@ function extractFromListItems(html: string, source: string): SearchResult[] {
 
     const aMatch = block.match(/<a[^>]*href="[^"]*"[^>]*>([\s\S]*?)<\/a>/i);
     const title = aMatch ? htmlDecode(aMatch[1].replace(/<[^>]*>/g, '').trim()) : '';
-    const pwd = extractPassword(block);
-    if (pwd) links.forEach(l => l.password = l.password || pwd);
+    const pwd = extractPassword(block, links[0]?.url);    if (pwd) links.forEach(l => l.password = l.password || pwd);
 
     groups.push({
       title: title || source,
@@ -275,7 +284,7 @@ function extractFromCards(html: string, source: string): SearchResult[] {
       || block.match(/<a[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/a>/i)
       || block.match(/<strong[^>]*>([\s\S]*?)<\/strong>/i);
     const title = titleMatch ? htmlDecode(titleMatch[1].replace(/<[^>]*>/g, '').trim()) : '';
-    const pwd = extractPassword(block);
+    const pwd = extractPassword(block, links[0]?.url);
     if (pwd) links.forEach(l => l.password = l.password || pwd);
 
     if (title || links.length > 0) {
@@ -336,7 +345,7 @@ function extractFromLinks(html: string, source: string): SearchResult[] {
 
   // Build results from groups
   return groups.slice(0, 50).map((group, idx) => {
-    const pwd = extractPassword(group.context);
+    const pwd = extractPassword(group.context, group.links[0]?.url);
     if (pwd) group.links.forEach(l => l.password = l.password || pwd);
 
     // Try to extract title from context
@@ -369,7 +378,8 @@ function extractLinks(text: string): Link[] {
       const norm = normalizeUrl(url);
       if (!seen.has(norm)) {
         seen.add(norm);
-        links.push({ type, url, password: '' });
+        const pwd = extractPassword('', url);
+        links.push({ type, url, password: pwd });
       }
     }
   }

@@ -18,13 +18,23 @@ function htmlDecode(s: string): string {
   return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
-// Password patterns from original Go plugin
-const pwdPatterns = [/提取码[:：]?\s*([0-9A-Za-z]{4,8})/i, /密码[:：]?\s*([0-9A-Za-z]{4,8})/i, /pwd\s*[=:：]\s*([0-9A-Za-z]{4,8})/i, /code\s*[=:：]\s*([0-9A-Za-z]{4,8})/i];
+// Password patterns from original Go plugin (Go uses +, not {4,8})
+const pwdPatterns = [/提取码[:：]?\s*([0-9A-Za-z]+)/i, /密码[:：]?\s*([0-9A-Za-z]+)/i, /pwd\s*[=:：]\s*([0-9A-Za-z]+)/i, /code\s*[=:：]\s*([0-9A-Za-z]+)/i];
 
-function extractPassword(text: string): string {
+function extractPassword(text: string, url?: string): string {
   for (const p of pwdPatterns) {
     const m = text.match(p);
     if (m) return m[1];
+  }
+  // Also check URL query params (matching Go yunso logic)
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      for (const k of ['pwd', 'pass', 'password', 'code']) {
+        const v = parsed.searchParams.get(k);
+        if (v) return v;
+      }
+    } catch {}
   }
   return '';
 }
@@ -89,12 +99,14 @@ function parseAlupanHtml(html: string): SearchResult[] {
         const url = lm[0];
         if (!seen.has(url)) {
           seen.add(url);
-          links.push({ type: pat.type, url, password: '' });
+          // Try URL query params for password first
+          const urlPwd = extractPassword('', url);
+          links.push({ type: pat.type, url, password: urlPwd });
         }
       }
     }
 
-    // Extract passwords from the block text
+    // Extract passwords from the block text (only set if not already found per-link)
     const textContent = block.replace(/<[^>]*>/g, ' ');
     const password = extractPassword(textContent);
 

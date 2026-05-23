@@ -123,6 +123,15 @@ function extractLinks(html: string, source: string, keyword: string): SearchResu
       const u = m[0].replace(/&amp;/g, '&');
       if (seen.has(u)) continue;
       seen.add(u);
+      // Extract password from URL query params (matching Go logic)
+      let pwd = '';
+      try {
+        const p = new URL(u);
+        for (const k of ['pwd', 'pass', 'password', 'code']) {
+          const v = p.searchParams.get(k);
+          if (v) { pwd = v; break; }
+        }
+      } catch {}
       results.push({
         message_id: source + '_' + idx,
         unique_id: u,
@@ -130,7 +139,7 @@ function extractLinks(html: string, source: string, keyword: string): SearchResu
         datetime: new Date().toISOString(),
         title: keyword + ' - ' + type,
         content: '',
-        links: [{ type, url: u, password: '' }],
+        links: [{ type, url: u, password: pwd }],
       });
       idx++;
     }

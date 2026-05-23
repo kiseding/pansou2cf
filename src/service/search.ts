@@ -143,24 +143,23 @@ export async function search(req: SearchRequest, env?: any): Promise<SearchRespo
 
   if (useTg && req.channels) {
     promises.push((async () => {
-      // Search ALL channels (not just 3), matching Go behavior
-      const tasks = req.channels!.map(ch => () => searchTGChannel(ch, keyword));
-      const concurrency = Math.min((req.conc || 10) * 2, 50);
-      const all = await runWithConcurrency(tasks, concurrency);
-      tgResults = all.flat();
+      // Fire all channels in parallel — Workers I/O wait doesn't count toward CPU
+      const limit = req.conc || 50;
+      const tasks = req.channels!.slice(0, limit).map(ch => searchTGChannel(ch, keyword));
+      const settled = await Promise.allSettled(tasks);
+      for (const r of settled) { if (r.status === 'fulfilled') tgResults.push(...r.value); }
     })());
   }
 
   if (usePlugin) {
     promises.push((async () => {
       const pluginList = getFiltered(normalizedPlugins);
-      const conc = req.conc || 0;
-      // conc=0 means all plugins; conc=N runs first N plugins for progressive search
-      const selected = conc > 0 ? pluginList.slice(0, conc) : pluginList;
-      const batchSize = Math.min(conc || 20, 20); // concurrency within batch
-      const tasks = selected.map(p => () => searchPlugin(p.name, keyword));
-      const all = await runWithConcurrency(tasks, batchSize);
-      pluginResults = all.flat();
+      // Fire all plugins in parallel up to 50 subrequests (Free plan limit)
+      const limit = Math.min(req.conc || 50, 50);
+      const selected = pluginList.slice(0, limit);
+      const tasks = selected.map(p => searchPlugin(p.name, keyword));
+      const settled = await Promise.allSettled(tasks);
+      for (const r of settled) { if (r.status === 'fulfilled') pluginResults.push(...r.value); }
     })());
   }
 

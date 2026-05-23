@@ -35,10 +35,6 @@ const searchTime = ref<number | undefined>(undefined);
 // 后台更新状态
 const isUpdating = ref(false);
 const updateCount = ref(0);
-const updateTimer = ref<number | null>(null);
-const secondSearchTimeout = ref<number | null>(null);
-const thirdSearchTimeout = ref<number | null>(null);
-const fourthSearchTimeout = ref<number | null>(null);
 const lastSearchParams = ref<SearchParams | null>(null);
 const showExportModal = ref(false);
 const navHeaderRef = ref<HTMLElement | null>(null);
@@ -215,61 +211,29 @@ const handleSearch = async (params: SearchParams) => {
   const hasPlugins = config.plugins.length > 0;
 
   try {
-    // 后台预热：用全部插件搜一次，触发 Worker 端所有插件的 HTTP 请求
-    // 结果不展示，只为让 Worker 热缓存（匹配 Go 版 AsyncSearch 后台 goroutine 机制）
-    if (hasPlugins || hasChannels) {
-      const warmParams: SearchParams = { ...innerParams, conc: 0, src: 'all' };
-      search(warmParams).catch(() => {});
-    }
+    // 一次性全并发：Workers 50 个子请求配额全部用完，I/O 等待不消耗 CPU
+    const userParams: SearchParams = { ...innerParams, conc: 50, src: innerParams.src || 'all' };
 
-    // 第一轮：快速出结果（conc=15，约 3s）
-    const userParams: SearchParams = { ...innerParams, conc: 15 };
-
-    // 先发起第一次搜索请求（显示结果）
     search(userParams)
       .then(firstResponse => {
-        
         if (firstResponse && firstResponse.total !== undefined) {
-          // 使用第一次搜索结果进行显示
           updateSearchResults(firstResponse);
           searchTime.value = Date.now() - startTime;
-          // 第一次搜索完成后，关闭加载状态
           loading.value = false;
-          
-          // 根据配置决定是否需要后续搜索：
-          // 1. 同时启用tg和plugin：需要第二次、第三次搜索（src=all）
-          // 2. 只启用tg：不需要后续搜索
-          // 3. 只启用plugin：需要第二次、第三次搜索（src=plugin）
-          if (hasPlugins) {
-            // 只要启用了插件，就需要后续搜索（插件是异步的）
-            // 记录第一次搜索完成时间
-            const firstSearchCompleteTime = Date.now();
-            
-            // 开始第二次搜索
-            startSecondAllSearch(firstSearchCompleteTime);
-          } else {
-            // 只有TG或都没有，不需要后续搜索，标记搜索完成
-            isActivelySearching.value = false;
-          }
+          isActivelySearching.value = false;
         } else {
-          console.error('第一次搜索结果格式不正确:', firstResponse);
           loading.value = false;
           isActivelySearching.value = false;
         }
       })
       .catch(error => {
-        console.error('第一次搜索出错:', error);
+        console.error('搜索出错:', error);
         loading.value = false;
         isActivelySearching.value = false;
       });
-    
-    // 设置一个超时，确保即使搜索很慢，UI也不会一直处于加载状态
-    setTimeout(() => {
-      if (loading.value) {
-        loading.value = false;
-      }
-    }, 5000); // 5秒后如果还在加载，则关闭加载状态
-    
+
+    setTimeout(() => { if (loading.value) loading.value = false; }, 8000);
+
   } catch (error) {
     console.error('搜索初始化出错:', error);
     loading.value = false;
@@ -700,7 +664,7 @@ watch(
   { deep: true }
 );
 
-// 根据配置计算第二次、第三次搜索的src参数
+// 切换到搜索页面（保持搜索结果）
 const calculateSrcForFullSearch = (): 'all' | 'tg' | 'plugin' => {
   try {
     const config = checkConfig();

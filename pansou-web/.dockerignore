@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Node.js
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+
+# 构建文件
+dist
+dist-ssr
+coverage
+*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志
+logs
+*.log
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 开发工具
+.nyc_output

@@ -1,0 +1,180 @@
+import axios from 'axios';
+import type { SearchResponse, LinkCheckItem, LinkCheckResponse } from '@/types';
+
+const api = axios.create({
+  baseURL: '/api',
+  timeout: 10000
+});
+
+// 请求拦截器 - 自动添加token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// 响应拦截器 - 处理401
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // 清除token
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_username');
+      
+      // 触发显示登录窗口的事件
+      window.dispatchEvent(new CustomEvent('auth:required'));
+    }
+    return Promise.reject(error);
+  }
+);
+
+// 搜索参数接口
+export interface SearchParams {
+  kw: string;
+  refresh?: boolean;
+  res?: 'all' | 'results' | 'merge';
+  src?: 'all' | 'tg' | 'plugin';
+  plugins?: string;
+  channels?: string;
+  cloud_types?: string;
+  ext?: string;
+}
+
+// API响应包装类型
+interface ApiResponse<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+// 健康状态接口（基于实际API返回）
+export interface HealthStatus {
+  status: string;
+  plugins_enabled: boolean;
+  plugin_count: number;
+  plugins: string[];
+  channels: string[];
+  auth_enabled?: boolean;
+}
+
+// 登录请求参数
+export interface LoginParams {
+  username: string;
+  password: string;
+}
+
+// 登录响应
+export interface LoginResponse {
+  token: string;
+  expires_at: number;
+  username: string;
+}
+
+// 认证状态
+export interface AuthStatus {
+  enabled: boolean;
+  authenticated: boolean;
+}
+
+// 获取API健康状态
+export const getHealth = async (): Promise<HealthStatus> => {
+  const response = await api.get<HealthStatus>('/health');
+  return response.data;
+};
+
+// 搜索API
+export const search = async (params: SearchParams): Promise<SearchResponse> => {
+  // 添加ext参数，包含referer信息
+  const searchParams = {
+    ...params,
+    ext: JSON.stringify({ referer: "https://dm.xueximeng.com" })
+  };
+  
+  const response = await api.get<ApiResponse<SearchResponse>>('/search', { params: searchParams });
+  
+  // 如果响应中包含data字段，则返回data
+  if (response.data && response.data.data) {
+    return response.data.data;
+  }
+  
+  // 如果响应本身就是SearchResponse格式
+  if (response.data && response.data.total !== undefined && response.data.merged_by_type) {
+    return response.data as unknown as SearchResponse;
+  }
+  
+  // 返回空结果
+  return {
+    total: 0,
+    results: [],
+    merged_by_type: {}
+  };
+};
+
+// 登录
+export const login = async (params: LoginParams): Promise<LoginResponse> => {
+  const response = await api.post<LoginResponse>('/auth/login', params);
+  return response.data;
+};
+
+// 验证token
+export const verifyToken = async (): Promise<boolean> => {
+  try {
+    await api.post('/auth/verify');
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// 退出登录
+export const logout = async (): Promise<void> => {
+  try {
+    await api.post('/auth/logout');
+  } finally {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_username');
+  }
+};
+
+export const inspectVisibleLinks = async (
+  items: LinkCheckItem[],
+  view_token?: string
+): Promise<LinkCheckResponse> => {
+  const response = await api.post<LinkCheckResponse>('/check/links', {
+    items,
+    view_token
+  });
+  return response.data;
+};
+
+// 检查认证状态
+export const checkAuthStatus = async (): Promise<AuthStatus> => {
+  try {
+    const health = await getHealth();
+    const authEnabled = health.auth_enabled || false;
+    const token = localStorage.getItem('auth_token');
+    
+    if (!authEnabled) {
+      return { enabled: false, authenticated: true };
+    }
+    
+    if (!token) {
+      return { enabled: true, authenticated: false };
+    }
+    
+    const valid = await verifyToken();
+    return { enabled: true, authenticated: valid };
+  } catch {
+    return { enabled: false, authenticated: true };
+  }
+};
+
+export default api; 

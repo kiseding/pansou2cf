@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* OneFour 主题变量 */
+:root {
+  /* 基础色彩 */
+  --background: 255 255 255;
+  --foreground: 17 17 17;
+  --card: 255 255 255;
+  --card-foreground: 17 17 17;
+  --popover: 255 255 255;
+  --popover-foreground: 17 17 17;
+
+  /* 主色调 - 更活泼的蓝色 */
+  --primary: 59 130 246;
+  --primary-foreground: 255 255 255;
+
+  /* 次要色调 */
+  --secondary: 248 250 252;
+  --secondary-foreground: 30 41 59;
+
+  /* 柔和色调 */
+  --muted: 248 250 252;
+  --muted-foreground: 100 116 139;
+
+  /* 强调色 - 活泼的紫色 */
+  --accent: 147 51 234;
+  --accent-foreground: 255 255 255;
+
+  /* 破坏性色调 */
+  --destructive: 239 68 68;
+  --destructive-foreground: 255 255 255;
+
+  /* 边框和输入 */
+  --border: 226 232 240;
+  --input: 226 232 240;
+  --ring: 59 130 246;
+
+  /* 网格点颜色 */
+  --dot-color: 59 130 246;
+
+  /* 圆角 */
+  --radius: 0.5rem;
+}
+
+/* 网格点背景 */
+.bg-dot-pattern {
+  background-image: radial-gradient(circle, rgb(var(--dot-color) / 0.2) 1px, transparent 1px);
+  background-size: 20px 20px;
+  animation: grid-move 20s linear infinite;
+}
+
+/* 网格移动动画 */
+@keyframes grid-move {
+  0% { background-position: 0 0; }
+  100% { background-position: 20px 20px; }
+}
+
+/* 渐变文字效果 */
+@keyframes shine {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shine-text {
+  background: linear-gradient(90deg, transparent, rgb(var(--primary)), transparent);
+  background-size: 200% 100%;
+  animation: shine 3s ease-in-out infinite;
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+/* 自定义组件样式 */
+@layer components {
+  /* 按钮基础样式 */
+  .btn {
+    @apply inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow hover:shadow-md;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+  }
+
+  /* 输入框样式 */
+  .input {
+    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300;
+  }
+
+  .input-search {
+    @apply text-center pr-12 border-primary/20 hover:border-primary/40 shadow-sm hover:shadow-md focus-visible:shadow-lg focus-visible:border-primary/60;
+  }
+
+  /* 卡片样式 */
+  .card {
+    @apply rounded-lg border bg-card text-card-foreground shadow-sm transition-all duration-300;
+  }
+
+  .card-header {
+    @apply flex flex-col space-y-1.5 p-6;
+  }
+
+  .card-content {
+    @apply p-6 pt-0;
+  }
+
+  /* 标签页样式 */
+  .tabs-list {
+    @apply inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground;
+  }
+
+  .tabs-trigger {
+    @apply inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm;
+  }
+
+  /* 导航栏样式 */
+  .nav-header {
+    @apply backdrop-blur-md bg-background/80 border-b border-border;
+  }
+
+  /* 搜索结果项 */
+  .search-result-item {
+    @apply p-4 border border-border rounded-lg transition-all duration-300 bg-card hover:bg-muted/50 hover:border-muted-foreground/30 hover:shadow-md hover:scale-[1.01];
+  }
+
+  .search-result-title {
+    @apply text-lg font-semibold text-foreground mb-2 break-all hover:text-primary transition-colors;
+  }
+
+  .search-result-url {
+    @apply text-sm text-muted-foreground mb-3 break-all;
+  }
+
+  .search-result-description {
+    @apply text-sm text-muted-foreground/80 line-clamp-3;
+  }
+
+  /* 统计信息样式 */
+  .stats-container {
+    @apply flex items-center justify-center gap-4 text-sm text-muted-foreground mb-6 p-4 bg-muted/30 rounded-lg backdrop-blur-sm;
+  }
+
+  .stats-item {
+    @apply flex items-center gap-2 transition-colors hover:text-foreground;
+  }
+
+  /* 主要内容区域 */
+  .main-content {
+    @apply w-full max-w-[568px];
+  }
+
+  /* 页脚样式 */
+  .footer {
+    @apply w-full py-4 px-4 mt-8 bg-background/80 backdrop-blur-sm border-t border-border;
+  }
+}

@@ -90,6 +90,7 @@ GET /api/health
 | `CLOUDFLARE_ACCOUNT_ID` | ✓ | Cloudflare 账户 ID |
 | `PLUGIN_KV_ID` | ✓ | KV namespace ID |
 | `ADMIN_PASSWORD` | ✓ | 管理员密码 |
+| `AUTH_JWT_SECRET` | ✓ | JWT 签名密钥（随机字符串） |
 | `PANLIAN_ENCRYPTION_KEY` 等 | | 插件加密密钥（可选，有默认值） |
 
 创建 KV namespace：
@@ -103,8 +104,8 @@ npx wrangler kv:namespace create PLUGIN_KV
 |---|---|
 | `CHANNELS` | `tgsearchers6` |
 | `ENABLED_PLUGINS` | 22 个精选（空字符串=全部 89 个，但不推荐） |
-| `AUTH_ENABLED` | `false` |
-| `AUTH_USERS` | 空 |
+| `AUTH_ENABLED` | `true` |
+| `AUTH_USERS` | `admin:$ADMIN_PASSWORD` |
 | `PLUGIN_TIMEOUT` | `8` |
 
 ## 项目结构

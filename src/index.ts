@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { getConfig } from './config';
 import { searchRoute } from './routes/search';
-import { authRoute } from './routes/auth';
+import { authRoute, verifyTokenSelf } from './routes/auth';
 import { checkRoute } from './routes/check';
 import { getFiltered } from './plugin/registry';
 import { bootPlugins } from './plugin/boot';
@@ -22,18 +22,39 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Auth middleware (API only)
-app.use('/api/*', async (c, next) => {
+// Auth middleware — protects all /api/* and plugin routes (matching Go behavior)
+app.use('/api/*', authGuard);
+app.use('/qqpd/*', authGuard);
+app.use('/gying/*', authGuard);
+app.use('/panlian/*', authGuard);
+app.use('/weibo/*', authGuard);
+
+async function authGuard(c: any, next: any) {
   const config = getConfig(c.env);
   if (!config.authEnabled) return next();
-  const publicPaths = ['/api/auth/login', '/api/health'];
-  if (publicPaths.includes(c.req.path)) return next();
-  const auth = c.req.header('Authorization') || '';
-  if (!auth.startsWith('Bearer ')) {
-    return c.json({ code: 401, message: '未授权', data: null }, 401);
+
+  const path = c.req.path;
+  // Public paths (no auth required) — matching Go
+  const isPublic = path === '/api/auth/login' || path === '/api/auth/logout' || path === '/api/health'
+    || path.startsWith('/api/auth/') && (path.endsWith('/login') || path.endsWith('/logout'));
+  if (isPublic) return next();
+
+  const authHeader = c.req.header('Authorization') || '';
+  if (!authHeader) {
+    return c.json({ error: '未授权：缺少认证令牌', code: 'AUTH_TOKEN_MISSING' }, 401);
   }
+  if (!authHeader.startsWith('Bearer ')) {
+    return c.json({ error: '未授权：令牌格式错误', code: 'AUTH_TOKEN_INVALID_FORMAT' }, 401);
+  }
+
+  const token = authHeader.slice(7);
+  const claims = verifyTokenSelf(token, config.authJwtSecret);
+  if (!claims) {
+    return c.json({ error: '未授权：令牌无效或已过期', code: 'AUTH_TOKEN_INVALID' }, 401);
+  }
+  c.set('username', claims.user);
   await next();
-});
+}
 
 // API routes
 app.route('/api/search', searchRoute);

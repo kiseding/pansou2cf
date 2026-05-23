@@ -39,7 +39,7 @@ app.route('/api/check', checkRoute);
 
 app.get('/api/health', (c) => {
   const config = getConfig(c.env);
-  const plugins = getFiltered(config.enabledPlugins || []);
+  const plugins = getFiltered(config.enabledPlugins);
   return c.json({
     status: 'ok', auth_enabled: config.authEnabled,
     plugins_enabled: config.asyncPluginEnabled,
@@ -56,7 +56,7 @@ app.get('/ui.js', (c) => {
 
 app.get('/', (c) => {
   const config = getConfig(c.env);
-  const plugins = getFiltered(config.enabledPlugins || []);
+  const plugins = getFiltered(config.enabledPlugins);
   return c.html(homePage({
     channels: config.channels,
     enabledPlugins: plugins.map((p: any) => p.name),

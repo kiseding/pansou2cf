@@ -4,7 +4,7 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-AUTH_ENABLED = "true"
+AUTH_ENABLED = "false"
 AUTH_USERS = ""
 AUTH_JWT_SECRET = ""
 ADMIN_USERNAME = "admin"

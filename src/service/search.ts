@@ -228,7 +228,7 @@ async function searchTGChannel(channel: string, keyword: string): Promise<Search
       unique_id: item.unique_id || item.url || `${channel}_${idx}`,
       channel: `tg:${channel}`,
       datetime: item.datetime || new Date().toISOString(),
-      title: item.title || keyword,
+      title: item.title || 'TG_' + idx,
       content: item.content || '',
       links: item.links || [],
       images: item.images || [],
@@ -612,9 +612,17 @@ function mergeResultsByType(results: SearchResult[], keyword: string): MergedLin
         }
       }
 
-      // Keyword filter per-link
+      // Keyword filter per-link (Go: lines 1096-1101)
       if (!skipKeywordFilter && keyword) {
-        if (!title.toLowerCase().includes(lowerKeyword)) continue;
+        const titleLower = title.toLowerCase();
+        if (!titleLower.includes(lowerKeyword)) {
+          // Also check result content for keyword match as fallback
+          const contentLower = (r.content || '').toLowerCase();
+          if (!contentLower.includes(lowerKeyword)) continue;
+          // Content matched — use a snippet as the title
+          const kwIdx = contentLower.indexOf(lowerKeyword);
+          title = (r.content || '').substring(Math.max(0, kwIdx - 10), kwIdx + lowerKeyword.length + 20).trim();
+        }
       }
 
       // Trim title at keywords like 简介/描述 (Go: util.CutTitleByKeywords)

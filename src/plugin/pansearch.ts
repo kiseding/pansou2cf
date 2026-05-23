@@ -45,7 +45,11 @@ const pansearchPlugin: AsyncPlugin = {
         } else {
           // First non-empty line as title
           const lines = cleanText.split(/[。；\n]/);
-          title = (lines[0] || keyword).trim().slice(0, 50);
+          title = lines[0].trim().slice(0, 50);
+        }
+        // If no title could be extracted, use first netdisk link domain as hint
+        if (!title && links.length > 0) {
+          title = links[0].type + '_' + idx;
         }
 
         return {
@@ -53,7 +57,7 @@ const pansearchPlugin: AsyncPlugin = {
           unique_id: 'ps_' + (item.id || idx),
           channel: 'pansearch',
           datetime: item.time || new Date().toISOString(),
-          title: title || keyword,
+          title: title || ('资源_' + idx),
           content: cleanText.slice(0, 200),
           links,
           images: item.image ? [item.image] : [],

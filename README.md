@@ -2,6 +2,7 @@
 
 > 本项目来源于 [fish2018/pansou](https://github.com/fish2018/pansou)，一款高性能网盘资源搜索API服务。  
 > 原项目基于 Go + Docker，本项目将其完整移植到 Cloudflare Workers，保持接口兼容。
+> 由编程小白借助claude code+deepseek v4-api实现，目前性能不如原项目，搜索结果不尽人意，有诸多潜在bug。
 
 89 个搜索插件 | 127 个 TG 频道 | 13 种网盘+磁力+电驴 | 4 个账号管理 | Vue 3 前端 | JWT 认证 | 渐进式分轮搜索
 

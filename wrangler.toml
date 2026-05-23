@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+[assets]
+directory = "./pansou-web/dist"
+
 [vars]
 AUTH_ENABLED = "false"
 AUTH_USERS = ""
